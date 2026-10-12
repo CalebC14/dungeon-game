@@ -542,6 +542,10 @@ func resolve_party_action(
 				paladin_shield_bash(actor, selected_target)
 			elif ability_id == "paladin_taunt":
 				paladin_taunt(actor, selected_target)
+			elif ability_id == "paladin_divine_bulwark":
+				paladin_divine_bulwark(actor, party)
+			elif ability_id == "paladin_chivalrous_intervention":
+				paladin_chivalrous_intervention(actor, party)
 			else:
 				use_class_ability(actor, party)
 
@@ -1300,6 +1304,10 @@ func resolve_enemy_action(
 	if living_party.is_empty():
 		return
 
+	if bool(enemy.get("paladin_interrupt_next_action", false)):
+		enemy["paladin_interrupt_next_action"] = false
+		add_log(str(enemy.get("name", "Enemy")) + " loses its action to Chivalrous Intervention.")
+		return
 	if effects.has_control(enemy, "stun"):
 		add_log(enemy["name"] + " is stunned.")
 		return
@@ -1348,10 +1356,18 @@ func resolve_enemy_action(
 	# Valiant Protector protects other party members, never the Paladin.
 	damage = paladin_valiant_protector_mitigate(original_target, damage, living_party)
 	if intercepted:
-		damage = maxi(1, int(ceil(float(damage) * 0.70)))
-		# Extra threat is applied to the attacker only, not all enemies.
-		add_threat(enemy, target, float(damage), 1.5)
+		if effects.total(original_target, "paladin_intervention_mark") > 0.0 and paladin_tank_unlocked(target, 60):
+			damage = maxi(1, int(ceil(float(damage) * 0.50)))
+			if bool(enemy.get("boss", false)) or bool(enemy.get("is_boss", false)):
+				enemy["paladin_interrupt_next_action"] = true
+			else:
+				apply_combat_effect(enemy, {"id": "stun", "kind": "control", "duration": 2})
+		else:
+			damage = maxi(1, int(ceil(float(damage) * 0.70)))
+			# Extra threat is applied to the attacker only, not all enemies.
+			add_threat(enemy, target, float(damage), 1.5)
 	target["hp"] -= damage
+	paladin_thorns_retribution(target, enemy, damage)
 	effects.fire_trigger(target, "damage_taken", {"source": enemy, "damage": damage})
 
 	if target["hp"] < 0:
@@ -1649,4 +1665,45 @@ func paladin_taunt(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
 	table[key] = maxf(float(table.get(key, 0.0)), highest * 1.10 + 1.0)
 	enemy["threat"] = table
 	add_log(str(actor.get("name", "Paladin")) + " taunts " + str(enemy.get("name", "enemy")) + "!")
+	return true
+
+
+# PALADIN TANK PHASE 2
+# No WIS attribute exists in the current character schema. Support a
+# future explicit wis_mod, defaulting to zero rather than inventing a stat.
+func paladin_bulwark_duration(actor: Dictionary) -> int:
+	return clampi(1 + int(actor.get("wis_mod", 0)), 1, 5)
+
+func paladin_thorns_retribution(actor: Dictionary, attacker: Dictionary, received_damage: int) -> int:
+	if not paladin_tank_unlocked(actor, 40) or received_damage <= 0 or int(attacker.get("hp", 0)) <= 0:
+		return 0
+	var holy_damage: int = maxi(1, int(ceil(float(received_damage) * 0.20)))
+	attacker["hp"] = maxi(0, int(attacker["hp"]) - holy_damage)
+	add_threat(attacker, actor, float(holy_damage), 2.0)
+	add_log(str(actor.get("name", "Paladin")) + " retaliates with holy thorns for " + str(holy_damage) + " damage.")
+	return holy_damage
+
+func paladin_divine_bulwark(actor: Dictionary, party: Array) -> bool:
+	if not paladin_tank_unlocked(actor, 50) or not has_equipped_shield(actor):
+		return false
+	if not use_combat_resource(actor, "paladin_divine_bulwark", 20, 8):
+		return false
+	var duration: int = paladin_bulwark_duration(actor)
+	for member in party:
+		if int(member.get("hp", 0)) > 0:
+			apply_combat_effect(member, {"id": "paladin_divine_bulwark", "kind": "damage_reduction", "value": 0.30, "duration": duration})
+	add_log(str(actor.get("name", "Paladin")) + " invokes Divine Bulwark!")
+	return true
+
+func paladin_chivalrous_intervention(actor: Dictionary, party: Array) -> bool:
+	if not paladin_tank_unlocked(actor, 60) or not has_equipped_shield(actor):
+		return false
+	if not use_combat_resource(actor, "paladin_chivalrous_intervention", 30, 10):
+		return false
+	var source_key: String = combatant_key(actor)
+	for member in party:
+		if member != actor and int(member.get("hp", 0)) > 0:
+			apply_combat_effect(member, {"id": "paladin_chivalrous_intervention", "kind": "redirect", "source_key": source_key, "duration": 1})
+			apply_combat_effect(member, {"id": "paladin_intervention_mark", "kind": "paladin_intervention_mark", "value": 1.0, "duration": 1})
+	add_log(str(actor.get("name", "Paladin")) + " intervenes for the party!")
 	return true

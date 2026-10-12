@@ -2181,6 +2181,8 @@ func get_combat_skill_options(actor: Dictionary) -> Array:
 	var paladin_skills: Array = [
 		[10, "Shield Bash", "paladin_shield_bash", 0, 0, true],
 		[30, "Taunt", "paladin_taunt", 5, 4, false],
+		[50, "Divine Bulwark", "paladin_divine_bulwark", 20, 8, true],
+		[60, "Chivalrous Intervention", "paladin_chivalrous_intervention", 30, 10, true],
 	]
 	for entry in paladin_skills:
 		if combat.paladin_tank_unlocked(actor, int(entry[0])):
