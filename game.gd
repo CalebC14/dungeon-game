@@ -437,6 +437,14 @@ func apply_developer_action(action: String):
 			for member in party:
 				member["xp"] = int(member.get("xp", 0)) + 500
 			developer_menu.message = "+500 XP to every party member."
+		"give_xp_5000":
+			for member in party:
+				member["xp"] = int(member.get("xp", 0)) + 5000
+			developer_menu.message = "+5,000 XP to every party member."
+		"give_xp_50000":
+			for member in party:
+				member["xp"] = int(member.get("xp", 0)) + 50000
+			developer_menu.message = "+50,000 XP to every party member."
 		"give_gold":
 			progression.add_gold(1000)
 			developer_menu.message = "+1000 party gold."
@@ -2132,52 +2140,125 @@ func prepare_combat_state():
 	queue_redraw()
 
 
+# The skill picker is scoped to the current combat actor.
+var combat_skills_open: bool = false
+var combat_target_open: bool = false
+var combat_pending_action: String = ""
+var combat_pending_ability: String = ""
+var combat_target_page: int = 0
+
+func combat_skill_needs_target(ability_id: String) -> bool:
+	return ability_id in ["warrior_shield_bash", "warrior_taunt", "warrior_disarm"]
+
+func get_living_combat_targets() -> Array:
+	var available: Array = []
+	for enemy in combat.enemies:
+		if int(enemy.get("hp", 0)) > 0:
+			available.append(enemy)
+	return available
+
+func begin_combat_target_selection(action_name: String, ability_id: String = "") -> void:
+	combat_pending_action = action_name
+	combat_pending_ability = ability_id
+	combat_target_page = 0
+	combat_target_open = true
+	combat_skills_open = false
+	queue_redraw()
+
+
+func get_combat_skill_options(actor: Dictionary) -> Array:
+	var options: Array = [{"name": get_class_ability_name(str(actor.get("class", ""))), "id": "", "cost": 0, "cooldown": 0, "shield": false}]
+	var warrior_skills: Array = [
+		[10, "Shield Bash", "warrior_shield_bash", 0, 0, true],
+		[30, "Taunt", "warrior_taunt", 5, 4, false],
+		[40, "Disarm", "warrior_disarm", 8, 5, false],
+		[50, "Shield Wall", "warrior_shield_wall", 12, 6, true],
+		[60, "Unbreakable Guardian", "warrior_unbreakable_guardian", 15, 8, true],
+	]
+	for entry in warrior_skills:
+		if combat.warrior_tank_unlocked(actor, int(entry[0])):
+			options.append({"name": entry[1], "id": entry[2], "cost": entry[3], "cooldown": entry[4], "shield": entry[5]})
+	return options
+
+
+func combat_skill_unavailable_reason(actor: Dictionary, skill: Dictionary) -> String:
+	if bool(skill.get("shield", false)) and not combat.has_equipped_shield(actor):
+		return "shield required"
+	if int(actor.get("sp", 0)) < int(skill.get("cost", 0)):
+		return "not enough SP"
+	var ability_id: String = str(skill.get("id", ""))
+	if ability_id != "":
+		var remaining: int = combat.effects.cooldown_remaining(actor, ability_id)
+		if remaining > 0:
+			return "cooldown: " + str(remaining) + " rounds"
+	return ""
+
+
 # ============================================================
 # COMBAT INPUT
 # ============================================================
 
 func handle_combat_input(event):
-
 	if not event.is_pressed() or event.is_echo():
 		return
-
-	var actor = (
-		get_current_combat_character()
-	)
-
+	var actor = get_current_combat_character()
 	if actor.is_empty():
 		return
 
+	if combat_target_open:
+		if event.keycode in [KEY_ESCAPE, KEY_BACKSPACE]:
+			combat_target_open = false
+			combat_skills_open = combat_pending_action == "Ability"
+			queue_redraw()
+			return
+		var targets: Array = get_living_combat_targets()
+		var pages: int = maxi(1, ceili(float(targets.size()) / 9.0))
+		if event.keycode == KEY_N and combat_target_page < pages - 1:
+			combat_target_page += 1
+			queue_redraw()
+			return
+		if event.keycode == KEY_P and combat_target_page > 0:
+			combat_target_page -= 1
+			queue_redraw()
+			return
+		var choice: int = int(event.keycode) - int(KEY_1)
+		var index: int = combat_target_page * 9 + choice
+		if choice >= 0 and choice < 9 and index < targets.size():
+			var chosen_target: Dictionary = targets[index]
+			combat_target_open = false
+			queue_current_action(combat_pending_action, combat_pending_ability, chosen_target)
+		return
+
+	if combat_skills_open:
+		if event.keycode in [KEY_ESCAPE, KEY_BACKSPACE]:
+			combat_skills_open = false
+			queue_redraw()
+			return
+		var index: int = int(event.keycode) - int(KEY_1)
+		var skills: Array = get_combat_skill_options(actor)
+		if index >= 0 and index < skills.size():
+			var chosen: Dictionary = skills[index]
+			if combat_skill_unavailable_reason(actor, chosen) != "":
+				queue_redraw()
+				return
+			var skill_id: String = str(chosen["id"])
+			if combat_skill_needs_target(skill_id):
+				begin_combat_target_selection("Ability", skill_id)
+			else:
+				combat_skills_open = false
+				queue_current_action("Ability", skill_id)
+		return
+
 	match event.keycode:
-
 		KEY_1:
-
-			queue_current_action(
-				"Attack"
-			)
-
+			begin_combat_target_selection("Attack")
 		KEY_2:
-
-			queue_current_action(
-				"Defend"
-			)
-
+			queue_current_action("Defend")
 		KEY_3:
-
-			queue_current_action(
-				"Ability"
-			)
-
+			combat_skills_open = true
+			queue_redraw()
 		KEY_4:
-
 			attempt_party_escape()
-
-		KEY_5:
-			if combat.warrior_tank_unlocked(actor, 10):
-				queue_current_action("Ability", "warrior_shield_bash")
-		KEY_6:
-			if combat.warrior_tank_unlocked(actor, 30):
-				queue_current_action("Ability", "warrior_taunt")
 
 
 # ============================================================
@@ -2199,7 +2280,8 @@ func get_current_combat_character() -> Dictionary:
 
 func queue_current_action(
 	action_name: String,
-	ability_id: String = ""
+	ability_id: String = "",
+	target: Dictionary = {}
 ):
 
 	var actor = (
@@ -2212,11 +2294,9 @@ func queue_current_action(
 	if actor["hp"] <= 0:
 		return
 
-	combat.queue_action(
-		actor,
-		action_name,
-		ability_id
-	)
+	combat_skills_open = false
+	combat_target_open = false
+	combat.queue_action(actor, action_name, ability_id, target)
 
 	combat_character_index += 1
 
@@ -4709,71 +4789,37 @@ func draw_enemy_group():
 
 
 func draw_combat_action_menu():
-
-	var actor = (
-		get_current_combat_character()
-	)
-
+	var actor = get_current_combat_character()
 	if actor.is_empty():
 		return
-
-	var class_ability = (
-		get_class_ability_name(
-			actor["class"]
-		)
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			65,
-			270
-		),
-		"CHOOSE ACTION FOR: "
-		+ actor["name"]
-		+ " — "
-		+ actor["class"]
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			300
-		),
-		"1) ATTACK"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			325
-		),
-		"2) DEFEND"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			350
-		),
-		"3) "
-		+ class_ability
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			375
-		),
-		"4) RUN"
-	)
-
-	if combat.warrior_tank_unlocked(actor, 10):
-		draw_string(ThemeDB.fallback_font, Vector2(80, 400), "5) SHIELD BASH (shield required)")
+	draw_string(ThemeDB.fallback_font, Vector2(65, 270),
+		"CHOOSE ACTION FOR: " + str(actor["name"]) + " — " + str(actor["class"]))
+	if combat_target_open:
+		draw_string(ThemeDB.fallback_font, Vector2(80, 300), "SELECT TARGET (ESC to go back)")
+		var targets: Array = get_living_combat_targets()
+		for i in range(combat_target_page * 9, mini(targets.size(), (combat_target_page + 1) * 9)):
+			var enemy: Dictionary = targets[i]
+			draw_string(ThemeDB.fallback_font, Vector2(80, 325 + (i % 9) * 25),
+				str(i % 9 + 1) + ") " + str(enemy.get("name", "Enemy")) + " — " + str(enemy.get("hp", 0)) + " HP")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 570), "N) Next page    P) Previous page")
+		return
+	if combat_skills_open:
+		draw_string(ThemeDB.fallback_font, Vector2(80, 300), "SKILLS (ESC to go back)")
+		var options: Array = get_combat_skill_options(actor)
+		for i in range(mini(options.size(), 6)):
+			var skill: Dictionary = options[i]
+			var cost: int = int(skill["cost"])
+			var suffix: String = " (" + str(cost) + " SP)" if cost > 0 else ""
+			var reason: String = combat_skill_unavailable_reason(actor, skill)
+			if reason != "":
+				suffix += " [" + reason + "]"
+			draw_string(ThemeDB.fallback_font, Vector2(80, 325 + i * 25),
+				str(i + 1) + ") " + str(skill["name"]) + suffix)
+		return
+	draw_string(ThemeDB.fallback_font, Vector2(80, 300), "1) ATTACK")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 325), "2) DEFEND")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 350), "3) SKILLS")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 375), "4) RUN")
 
 
 func get_class_ability_name(

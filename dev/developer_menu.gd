@@ -33,6 +33,8 @@ func get_action_for_key(keycode: int) -> String:
 		KEY_V: return "quest_bristle_defeated"
 		KEY_P: return "heal_party"
 		KEY_X: return "give_xp"
+		KEY_F9: return "give_xp_5000"
+		KEY_F10: return "give_xp_50000"
 		KEY_G: return "give_gold"
 		KEY_T: return "load_test_party"
 		KEY_R: return "give_reliquary_key"
@@ -58,7 +60,8 @@ func get_display_lines() -> Array:
 		"[M] Unlock Dreadmarch / Reveal Kazinov",
 		"",
 		"PARTY / WORLD",
-		"[P] Heal Party     [X] +500 XP Each     [G] +1000 Gold     [T] Test Party",
+		"[P] Heal Party   [X] +500 XP   [F9] +5,000 XP   [F10] +50,000 XP",
+		"[G] +1000 Gold     [T] Test Party",
 		"",
 		"[ESC] Return to game     [F12] Toggle menu"
 	]

@@ -330,6 +330,15 @@ func get_living_enemies() -> Array:
 	return living
 
 
+func resolve_attack_target(selected_target: Dictionary) -> Dictionary:
+	if selected_target.is_empty():
+		return get_first_living_enemy()
+	for enemy in enemies:
+		if enemy == selected_target and int(enemy.get("hp", 0)) > 0:
+			return enemy
+	add_log("Selected target is no longer available.")
+	return {}
+
 func get_first_living_enemy() -> Dictionary:
 
 	for enemy in enemies:
@@ -395,13 +404,15 @@ func clear_actions() -> void:
 func queue_action(
 	character: Dictionary,
 	action_name: String,
-	ability_id: String = ""
+	ability_id: String = "",
+	target: Dictionary = {}
 ) -> void:
 
 	party_actions.append({
 		"actor": character,
 		"action": action_name,
-		"ability_id": ability_id
+		"ability_id": ability_id,
+		"target": target
 	})
 
 
@@ -496,6 +507,7 @@ func resolve_party_action(
 		return
 
 	ensure_warrior_tank_presence(actor)
+	var selected_target: Dictionary = action_data.get("target", {})
 	var action_name = (
 		action_data["action"]
 	)
@@ -504,9 +516,7 @@ func resolve_party_action(
 
 		"Attack":
 
-			physical_attack(
-				actor
-			)
+			physical_attack(actor, selected_target)
 
 		"Defend":
 
@@ -518,9 +528,15 @@ func resolve_party_action(
 
 			var ability_id: String = str(action_data.get("ability_id", ""))
 			if ability_id == "warrior_shield_bash":
-				warrior_shield_bash(actor)
+				warrior_shield_bash(actor, selected_target)
 			elif ability_id == "warrior_taunt":
-				warrior_taunt(actor)
+				warrior_taunt(actor, selected_target)
+			elif ability_id == "warrior_disarm":
+				warrior_disarm(actor, selected_target)
+			elif ability_id == "warrior_shield_wall":
+				warrior_shield_wall(actor)
+			elif ability_id == "warrior_unbreakable_guardian":
+				warrior_unbreakable_guardian(actor, party)
 			else:
 				use_class_ability(actor, party)
 
@@ -530,10 +546,11 @@ func resolve_party_action(
 # ============================================================
 
 func physical_attack(
-	actor: Dictionary
+	actor: Dictionary,
+	selected_target: Dictionary = {}
 ) -> void:
 
-	var target = get_first_living_enemy()
+	var target = resolve_attack_target(selected_target)
 
 	if target.is_empty():
 		return
@@ -1296,10 +1313,18 @@ func resolve_enemy_action(
 		int(enemy.get("damage_max", enemy["attack"]))
 	)
 
+	# Interception happens before shield block, so the defender may block.
+	var original_target = target
+	var guardian = effects.redirect_target(original_target, living_party)
+	var intercepted = guardian != original_target
+	if intercepted:
+		target = guardian
 	# A successful shield block prevents this hit and may trigger Riposte.
 	if resolve_warrior_block(target, enemy):
 		return
 
+	# Disarm modifies physical attack damage before armor.
+	raw_damage = maxi(1, int(ceil(float(raw_damage) * (1.0 - effects.total(enemy, "physical_damage_reduction")))))
 	var absorption = inventory_system.get_total_absorption(target)
 	var damage = max(1, raw_damage - absorption)
 
@@ -1313,10 +1338,10 @@ func resolve_enemy_action(
 		damage = max(1, damage - 2)
 
 	damage = effects.mitigate(target, damage)
-	var recipient = effects.redirect_target(target, living_party)
-	if recipient != target:
-		damage = effects.mitigate(recipient, damage)
-		target = recipient
+	if intercepted:
+		damage = maxi(1, int(ceil(float(damage) * 0.70)))
+		# Extra threat is applied to the attacker only, not all enemies.
+		add_threat(enemy, target, float(damage), 1.5)
 	target["hp"] -= damage
 	effects.fire_trigger(target, "damage_taken", {"source": enemy, "damage": damage})
 
@@ -1457,13 +1482,13 @@ func ensure_warrior_tank_presence(actor: Dictionary) -> void:
 		apply_combat_effect(actor, {"id": "warrior_defenders_presence", "kind": "threat_multiplier", "value": 1.0, "duration": 999999})
 	# Shield block bonus is read by future block-resolution integration.
 
-func warrior_shield_bash(actor: Dictionary) -> bool:
+func warrior_shield_bash(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
 	if not warrior_tank_unlocked(actor, 10):
 		return false
 	if not has_equipped_shield(actor):
 		add_log(actor.get("name", "Warrior") + " needs a shield for Shield Bash.")
 		return false
-	var enemy = get_first_living_enemy()
+	var enemy = resolve_attack_target(selected_target)
 	if enemy.is_empty():
 		return false
 	ensure_warrior_tank_presence(actor)
@@ -1475,10 +1500,10 @@ func warrior_shield_bash(actor: Dictionary) -> bool:
 	return true
 
 # Phase 2: explicit enemy-targeted Taunt; shared effect/cooldown infrastructure.
-func warrior_taunt(actor: Dictionary) -> bool:
+func warrior_taunt(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
 	if not warrior_tank_unlocked(actor, 30):
 		return false
-	var enemy = get_first_living_enemy()
+	var enemy = resolve_attack_target(selected_target)
 	if enemy.is_empty():
 		return false
 	if not use_combat_resource(actor, "warrior_taunt", 5, 4):
@@ -1517,4 +1542,41 @@ func resolve_warrior_block(actor: Dictionary, attacker: Dictionary, block_roll: 
 			damage_enemy(actor, attacker, damage, "ripostes")
 			# Standard damage_enemy grants 1x threat. Add 1x more for 2x total.
 			add_threat(attacker, actor, float(damage), 1.0)
+	return true
+
+
+# WARRIOR TANK PHASE 3: uses existing combat effects and cooldowns.
+func warrior_disarm(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
+	if not warrior_tank_unlocked(actor, 40):
+		return false
+	var enemy = resolve_attack_target(selected_target)
+	if enemy.is_empty():
+		return false
+	if not use_combat_resource(actor, "warrior_disarm", 8, 5):
+		return false
+	var is_boss: bool = "boss" in enemy.get("tags", [])
+	apply_combat_effect(enemy, {"id": "warrior_disarm", "kind": "physical_damage_reduction", "value": 0.15 if is_boss else 0.30, "duration": 3})
+	add_log(str(actor.get("name", "Warrior")) + " disarms " + str(enemy.get("name", "enemy")) + "!")
+	return true
+
+func warrior_shield_wall(actor: Dictionary) -> bool:
+	if not warrior_tank_unlocked(actor, 50) or not has_equipped_shield(actor):
+		return false
+	if not use_combat_resource(actor, "warrior_shield_wall", 12, 6):
+		return false
+	apply_combat_effect(actor, {"id": "warrior_shield_wall", "kind": "damage_reduction", "value": 0.50, "duration": 2})
+	add_log(str(actor.get("name", "Warrior")) + " raises Shield Wall!")
+	return true
+
+func warrior_unbreakable_guardian(actor: Dictionary, party: Array) -> bool:
+	if not warrior_tank_unlocked(actor, 60) or not has_equipped_shield(actor):
+		return false
+	if not use_combat_resource(actor, "warrior_unbreakable_guardian", 15, 8):
+		return false
+	var key = combatant_key(actor)
+	for ally in party:
+		if ally == actor or int(ally.get("hp", 0)) <= 0:
+			continue
+		apply_combat_effect(ally, {"id": "warrior_unbreakable_guardian", "kind": "redirect", "source_key": key, "duration": 2})
+	add_log(str(actor.get("name", "Warrior")) + " protects the party with Unbreakable Guardian!")
 	return true
