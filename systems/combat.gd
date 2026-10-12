@@ -508,6 +508,7 @@ func resolve_party_action(
 
 	ensure_warrior_tank_presence(actor)
 	ensure_paladin_tank_presence(actor)
+	ensure_berserker_tank_presence(actor)
 	var selected_target: Dictionary = action_data.get("target", {})
 	var action_name = (
 		action_data["action"]
@@ -546,6 +547,10 @@ func resolve_party_action(
 				paladin_divine_bulwark(actor, party)
 			elif ability_id == "paladin_chivalrous_intervention":
 				paladin_chivalrous_intervention(actor, party)
+			elif ability_id == "berserker_lunatic_howl":
+				berserker_lunatic_howl(actor)
+			elif ability_id == "berserker_taunt":
+				berserker_taunt(actor, selected_target)
 			else:
 				use_class_ability(actor, party)
 
@@ -575,6 +580,8 @@ func physical_attack(
 
 	var damage = roll_character_damage(actor)
 	damage = max(1, damage - int(target.get("absorption", 0)))
+	# Brutal Challenge empowers physical attacks after previous successful hits.
+	damage = berserker_brutal_challenge_damage(actor, damage)
 
 	var crit_chance = 0.05 + actor["lck"] * 0.005
 
@@ -583,6 +590,7 @@ func physical_attack(
 		add_log(actor["name"] + " lands a critical hit!")
 
 	damage_enemy(actor, target, damage, "attacks")
+	berserker_brutal_challenge_on_hit(actor)
 
 
 func get_character_attack_stat(actor: Dictionary) -> String:
@@ -1407,6 +1415,8 @@ func get_character_avoidance(character: Dictionary) -> float:
 
 	if character.get("defending", false):
 		avoidance += 0.10
+	if berserker_tank_unlocked(character, 9):
+		avoidance += 0.05
 
 	return clamp(avoidance, 0.0, 0.60)
 
@@ -1706,4 +1716,65 @@ func paladin_chivalrous_intervention(actor: Dictionary, party: Array) -> bool:
 			apply_combat_effect(member, {"id": "paladin_chivalrous_intervention", "kind": "redirect", "source_key": source_key, "duration": 1})
 			apply_combat_effect(member, {"id": "paladin_intervention_mark", "kind": "paladin_intervention_mark", "value": 1.0, "duration": 1})
 	add_log(str(actor.get("name", "Paladin")) + " intervenes for the party!")
+	return true
+
+
+# ============================================================
+# BERSERKER TANK — PHASE 1 (LEVELS 9–30)
+# ============================================================
+func berserker_tank_unlocked(actor: Dictionary, required_level: int) -> bool:
+	return str(actor.get("class", "")) == "Berserker" and str(actor.get("specialization", "")) == "tank" and int(actor.get("level", 1)) >= required_level
+
+func ensure_berserker_tank_presence(actor: Dictionary) -> void:
+	if not berserker_tank_unlocked(actor, 9):
+		return
+	for effect in actor.get("effects", []):
+		if str(effect.get("id", "")) == "berserker_unyielding_fury":
+			return
+	apply_combat_effect(actor, {"id": "berserker_unyielding_fury", "kind": "threat_multiplier", "value": 1.0, "duration": 999999})
+
+func berserker_lunatic_howl(actor: Dictionary) -> bool:
+	if not berserker_tank_unlocked(actor, 10):
+		return false
+	var living: Array = get_living_enemies()
+	if living.is_empty():
+		return false
+	if not use_combat_resource(actor, "berserker_lunatic_howl", 8, 4):
+		return false
+	ensure_berserker_tank_presence(actor)
+	# Equivalent to two baseline attacks of threat on each enemy; no damage.
+	var attack_threat: float = float(maxi(1, roll_character_damage(actor))) * 2.0
+	for enemy in living:
+		add_threat(enemy, actor, attack_threat)
+		var boss: bool = bool(enemy.get("boss", false)) or bool(enemy.get("is_boss", false))
+		apply_combat_effect(enemy, {"id": "berserker_lunatic_howl", "kind": "physical_damage_reduction", "value": 0.05 if boss else 0.10, "duration": 2})
+	add_log(str(actor.get("name", "Berserker")) + " unleashes Lunatic Howl!")
+	return true
+
+func berserker_brutal_challenge_damage(actor: Dictionary, damage: int) -> int:
+	if not berserker_tank_unlocked(actor, 20):
+		return damage
+	return maxi(1, int(ceil(float(damage) * (1.0 + effects.total(actor, "berserker_physical_bonus")))))
+
+func berserker_brutal_challenge_on_hit(actor: Dictionary) -> void:
+	if not berserker_tank_unlocked(actor, 20):
+		return
+	apply_combat_effect(actor, {"id": "berserker_brutal_challenge", "kind": "berserker_physical_bonus", "value": 0.05, "duration": 3, "max_stacks": 3})
+
+func berserker_taunt(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
+	if not berserker_tank_unlocked(actor, 30):
+		return false
+	var enemy: Dictionary = resolve_attack_target(selected_target)
+	if enemy.is_empty():
+		return false
+	if not use_combat_resource(actor, "berserker_taunt", 5, 4):
+		return false
+	var table: Dictionary = enemy.get("threat", {})
+	var highest: float = 0.0
+	for value in table.values():
+		highest = maxf(highest, float(value))
+	var key: String = combatant_key(actor)
+	table[key] = maxf(float(table.get(key, 0.0)), highest * 1.10 + 1.0)
+	enemy["threat"] = table
+	add_log(str(actor.get("name", "Berserker")) + " taunts " + str(enemy.get("name", "enemy")) + "!")
 	return true
