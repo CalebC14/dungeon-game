@@ -519,6 +519,8 @@ func resolve_party_action(
 			var ability_id: String = str(action_data.get("ability_id", ""))
 			if ability_id == "warrior_shield_bash":
 				warrior_shield_bash(actor)
+			elif ability_id == "warrior_taunt":
+				warrior_taunt(actor)
 			else:
 				use_class_ability(actor, party)
 
@@ -1294,6 +1296,10 @@ func resolve_enemy_action(
 		int(enemy.get("damage_max", enemy["attack"]))
 	)
 
+	# A successful shield block prevents this hit and may trigger Riposte.
+	if resolve_warrior_block(target, enemy):
+		return
+
 	var absorption = inventory_system.get_total_absorption(target)
 	var damage = max(1, raw_damage - absorption)
 
@@ -1466,4 +1472,49 @@ func warrior_shield_bash(actor: Dictionary) -> bool:
 	# damage_enemy already adds baseline threat, so add only the
 	# remaining 2x to reach 3x total (before passive multipliers).
 	add_threat(enemy, actor, float(damage), 2.0)
+	return true
+
+# Phase 2: explicit enemy-targeted Taunt; shared effect/cooldown infrastructure.
+func warrior_taunt(actor: Dictionary) -> bool:
+	if not warrior_tank_unlocked(actor, 30):
+		return false
+	var enemy = get_first_living_enemy()
+	if enemy.is_empty():
+		return false
+	if not use_combat_resource(actor, "warrior_taunt", 5, 4):
+		add_log("Taunt unavailable (SP or cooldown).")
+		return false
+	var table: Dictionary = enemy.get("threat", {})
+	var highest: float = 0.0
+	for value in table.values():
+		highest = maxf(highest, float(value))
+	var key = combatant_key(actor)
+	table[key] = maxf(float(table.get(key, 0.0)), highest * 1.1 + 1.0)
+	enemy["threat"] = table
+	add_log(str(actor.get("name", "Warrior")) + " taunts " + str(enemy.get("name", "enemy")) + "!")
+	return true
+
+
+# Warrior Tank Phase 2: shield block and Riposte.
+# Optional rolls make these mechanics deterministic in regression tests.
+func warrior_block_chance(actor: Dictionary) -> float:
+	if not warrior_tank_unlocked(actor, 9) or not has_equipped_shield(actor):
+		return 0.0
+	return 0.10
+
+func resolve_warrior_block(actor: Dictionary, attacker: Dictionary, block_roll: float = -1.0, riposte_roll: float = -1.0) -> bool:
+	var chance = warrior_block_chance(actor)
+	if chance <= 0.0:
+		return false
+	var roll = randf() if block_roll < 0.0 else block_roll
+	if roll >= chance:
+		return false
+	add_log(str(actor.get("name", "Warrior")) + " blocks " + str(attacker.get("name", "enemy")) + "'s attack.")
+	if warrior_tank_unlocked(actor, 20) and int(attacker.get("hp", 0)) > 0:
+		var counter_roll = randf() if riposte_roll < 0.0 else riposte_roll
+		if counter_roll < 0.30:
+			var damage = maxi(1, int(round(float(roll_character_damage(actor)) * 0.75)))
+			damage_enemy(actor, attacker, damage, "ripostes")
+			# Standard damage_enemy grants 1x threat. Add 1x more for 2x total.
+			add_threat(attacker, actor, float(damage), 1.0)
 	return true

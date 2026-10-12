@@ -196,6 +196,7 @@ var training_pending_member: Dictionary = {}
 var training_pending_hp_gain: int = 0
 var training_pending_sp_gain: int = 0
 var training_choosing_stat: bool = false
+var training_choosing_specialization: bool = false
 
 # ============================================================
 # INVENTORY UI
@@ -1680,6 +1681,7 @@ func enter_training_hall():
 	training_pending_hp_gain = 0
 	training_pending_sp_gain = 0
 	training_choosing_stat = false
+	training_choosing_specialization = false
 	training_message = "The masters examine your party."
 	ensure_party_sp_fields()
 	game_state = GameState.TRAINING_HALL
@@ -1688,6 +1690,18 @@ func enter_training_hall():
 
 func handle_training_hall_input(event):
 	if not event.is_pressed() or event.is_echo():
+		return
+
+	if training_choosing_specialization:
+		if event.keycode == KEY_1:
+			training_pending_member["specialization"] = "tank"
+			training_message = str(training_pending_member.get("name", "Warrior")) + " chooses the Tank specialization."
+			training_pending_member = {}
+			training_choosing_specialization = false
+			queue_redraw()
+		elif event.keycode == KEY_ESCAPE:
+			training_message = "Choose specialization 1 to finish training."
+			queue_redraw()
 		return
 
 	if training_choosing_stat:
@@ -1776,7 +1790,13 @@ func complete_training_stat_choice(stat_choice: int):
 		+ " +1."
 	)
 
-	training_pending_member = {}
+	if str(member.get("class", "")) == "Warrior" and int(member.get("level", 1)) >= 9 and str(member.get("specialization", "")) == "":
+		training_pending_member = member
+		training_choosing_specialization = true
+		training_message = "Choose a Warrior specialization to finish training."
+
+	if not training_choosing_specialization:
+		training_pending_member = {}
 	training_pending_hp_gain = 0
 	training_pending_sp_gain = 0
 	training_choosing_stat = false
@@ -2155,6 +2175,9 @@ func handle_combat_input(event):
 		KEY_5:
 			if combat.warrior_tank_unlocked(actor, 10):
 				queue_current_action("Ability", "warrior_shield_bash")
+		KEY_6:
+			if combat.warrior_tank_unlocked(actor, 30):
+				queue_current_action("Ability", "warrior_taunt")
 
 
 # ============================================================
@@ -3809,6 +3832,13 @@ func draw_inventory_screen():
 
 func draw_training_hall():
 	draw_header("THE TRAINING HALL")
+
+	if training_choosing_specialization and not training_pending_member.is_empty():
+		draw_string(ThemeDB.fallback_font, Vector2(80, 155), "WARRIOR SPECIALIZATION")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 205), "1) TANK - Defender's Presence")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 255), "More specializations will be available later.")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 355), training_message)
+		return
 
 	if training_choosing_stat and not training_pending_member.is_empty():
 		var member = training_pending_member
