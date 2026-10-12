@@ -2148,10 +2148,16 @@ var combat_pending_ability: String = ""
 var combat_target_page: int = 0
 
 func combat_skill_needs_target(ability_id: String) -> bool:
-	return ability_id in ["warrior_shield_bash", "warrior_taunt", "warrior_disarm", "paladin_shield_bash", "paladin_taunt", "berserker_taunt"]
+	return ability_id in ["warrior_shield_bash", "warrior_taunt", "warrior_disarm", "paladin_shield_bash", "paladin_taunt", "berserker_taunt", "berserker_savage_intervention"]
 
 func get_living_combat_targets() -> Array:
 	var available: Array = []
+	if combat_pending_ability == "berserker_savage_intervention" and combat_target_open:
+		var actor: Dictionary = get_current_combat_character()
+		for member in party:
+			if member != actor and int(member.get("hp", 0)) > 0:
+				available.append(member)
+		return available
 	for enemy in combat.enemies:
 		if int(enemy.get("hp", 0)) > 0:
 			available.append(enemy)
@@ -2190,6 +2196,8 @@ func get_combat_skill_options(actor: Dictionary) -> Array:
 	var berserker_skills: Array = [
 		[10, "Lunatic Howl", "berserker_lunatic_howl", 8, 4, false],
 		[30, "Taunt", "berserker_taunt", 5, 4, false],
+		[40, "Savage Intervention", "berserker_savage_intervention", 10, 5, false],
+		[60, "Dance of Carnage", "berserker_dance_of_carnage", 25, 8, false],
 	]
 	for entry in berserker_skills:
 		if combat.berserker_tank_unlocked(actor, int(entry[0])):
@@ -2198,6 +2206,8 @@ func get_combat_skill_options(actor: Dictionary) -> Array:
 
 
 func combat_skill_unavailable_reason(actor: Dictionary, skill: Dictionary) -> String:
+	if str(skill.get("id", "")) in ["berserker_savage_intervention", "berserker_dance_of_carnage"] and not combat.berserker_has_melee_weapon(actor):
+		return "melee weapon required"
 	if bool(skill.get("shield", false)) and not combat.has_equipped_shield(actor):
 		return "shield required"
 	if int(actor.get("sp", 0)) < int(skill.get("cost", 0)):
@@ -2252,7 +2262,7 @@ func handle_combat_input(event):
 			return
 		var index: int = int(event.keycode) - int(KEY_1)
 		var skills: Array = get_combat_skill_options(actor)
-		if index >= 0 and index < skills.size():
+		if index >= 0 and index < mini(skills.size(), 9):
 			var chosen: Dictionary = skills[index]
 			if combat_skill_unavailable_reason(actor, chosen) != "":
 				queue_redraw()
@@ -4811,7 +4821,7 @@ func draw_combat_action_menu():
 	draw_string(ThemeDB.fallback_font, Vector2(65, 270),
 		"CHOOSE ACTION FOR: " + str(actor["name"]) + " — " + str(actor["class"]))
 	if combat_target_open:
-		draw_string(ThemeDB.fallback_font, Vector2(80, 300), "SELECT TARGET (ESC to go back)")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 300), "SELECT ALLY (ESC to go back)" if combat_pending_ability == "berserker_savage_intervention" else "SELECT TARGET (ESC to go back)")
 		var targets: Array = get_living_combat_targets()
 		for i in range(combat_target_page * 9, mini(targets.size(), (combat_target_page + 1) * 9)):
 			var enemy: Dictionary = targets[i]
@@ -4822,7 +4832,7 @@ func draw_combat_action_menu():
 	if combat_skills_open:
 		draw_string(ThemeDB.fallback_font, Vector2(80, 300), "SKILLS (ESC to go back)")
 		var options: Array = get_combat_skill_options(actor)
-		for i in range(mini(options.size(), 6)):
+		for i in range(mini(options.size(), 9)):
 			var skill: Dictionary = options[i]
 			var cost: int = int(skill["cost"])
 			var suffix: String = " (" + str(cost) + " SP)" if cost > 0 else ""

@@ -551,6 +551,10 @@ func resolve_party_action(
 				berserker_lunatic_howl(actor)
 			elif ability_id == "berserker_taunt":
 				berserker_taunt(actor, selected_target)
+			elif ability_id == "berserker_savage_intervention":
+				berserker_savage_intervention(actor, party, selected_target)
+			elif ability_id == "berserker_dance_of_carnage":
+				berserker_dance_of_carnage(actor)
 			else:
 				use_class_ability(actor, party)
 
@@ -582,6 +586,7 @@ func physical_attack(
 	damage = max(1, damage - int(target.get("absorption", 0)))
 	# Brutal Challenge empowers physical attacks after previous successful hits.
 	damage = berserker_brutal_challenge_damage(actor, damage)
+	damage = berserker_untouchable_damage(actor, damage)
 
 	var crit_chance = 0.05 + actor["lck"] * 0.005
 
@@ -1323,6 +1328,7 @@ func resolve_enemy_action(
 	var hit_chance = get_enemy_hit_chance(enemy, target)
 
 	if randf() > hit_chance:
+		berserker_untouchable_on_dodge(target)
 		add_log(
 			enemy["name"] + " attacks " + target["name"]
 			+ " but misses. [" + str(int(hit_chance * 100.0)) + "%]"
@@ -1338,8 +1344,10 @@ func resolve_enemy_action(
 	var original_target = target
 	var guardian = effects.redirect_target(original_target, living_party)
 	var intercepted = guardian != original_target
+	var savage_intercept: bool = false
 	if intercepted:
 		target = guardian
+		savage_intercept = berserker_consume_savage_intervention(original_target, target)
 	# A successful shield block prevents this hit and may trigger Riposte.
 	if resolve_warrior_block(target, enemy):
 		return
@@ -1364,7 +1372,10 @@ func resolve_enemy_action(
 	# Valiant Protector protects other party members, never the Paladin.
 	damage = paladin_valiant_protector_mitigate(original_target, damage, living_party)
 	if intercepted:
-		if effects.total(original_target, "paladin_intervention_mark") > 0.0 and paladin_tank_unlocked(target, 60):
+		if savage_intercept:
+			# Counterattack resolves after the incoming hit below.
+			pass
+		elif effects.total(original_target, "paladin_intervention_mark") > 0.0 and paladin_tank_unlocked(target, 60):
 			damage = maxi(1, int(ceil(float(damage) * 0.50)))
 			if bool(enemy.get("boss", false)) or bool(enemy.get("is_boss", false)):
 				enemy["paladin_interrupt_next_action"] = true
@@ -1376,6 +1387,8 @@ func resolve_enemy_action(
 			add_threat(enemy, target, float(damage), 1.5)
 	target["hp"] -= damage
 	paladin_thorns_retribution(target, enemy, damage)
+	if savage_intercept and int(target.get("hp", 0)) > 0:
+		berserker_savage_counterattack(target, enemy)
 	effects.fire_trigger(target, "damage_taken", {"source": enemy, "damage": damage})
 
 	if target["hp"] < 0:
@@ -1417,6 +1430,7 @@ func get_character_avoidance(character: Dictionary) -> float:
 		avoidance += 0.10
 	if berserker_tank_unlocked(character, 9):
 		avoidance += 0.05
+	avoidance += effects.total(character, "berserker_dodge_bonus")
 
 	return clamp(avoidance, 0.0, 0.60)
 
@@ -1450,7 +1464,8 @@ func combatant_key(actor: Dictionary) -> String:
 func add_threat(enemy: Dictionary, actor: Dictionary, amount: float, multiplier: float = 1.0) -> void:
 	var table: Dictionary = enemy.get("threat", {})
 	var key = combatant_key(actor)
-	table[key] = maxf(0.0, float(table.get(key, 0.0)) + amount * multiplier * effects.threat_multiplier(actor))
+	var untouchable_bonus: float = effects.total(actor, "berserker_untouchable_threat")
+	table[key] = maxf(0.0, float(table.get(key, 0.0)) + amount * multiplier * effects.threat_multiplier(actor) * (1.0 + untouchable_bonus))
 	enemy["threat"] = table
 
 func add_threat_from_damage(actor: Dictionary, damage: int, multiplier: float = 1.0) -> void:
@@ -1777,4 +1792,81 @@ func berserker_taunt(actor: Dictionary, selected_target: Dictionary = {}) -> boo
 	table[key] = maxf(float(table.get(key, 0.0)), highest * 1.10 + 1.0)
 	enemy["threat"] = table
 	add_log(str(actor.get("name", "Berserker")) + " taunts " + str(enemy.get("name", "enemy")) + "!")
+	return true
+
+
+# ============================================================
+# BERSERKER TANK — PHASE 2 (LEVELS 40–60)
+# ============================================================
+func berserker_has_melee_weapon(actor: Dictionary) -> bool:
+	var weapon_id = actor.get("equipment", {}).get("weapon", null)
+	if typeof(weapon_id) != TYPE_STRING or not ItemData.ITEMS.has(weapon_id):
+		return false
+	var item: Dictionary = ItemData.ITEMS[weapon_id]
+	if str(item.get("slot", "")) != "weapon":
+		return false
+	var name: String = str(item.get("name", "")).to_lower()
+	return not ("bow" in name or "crossbow" in name or "wand" in name)
+
+func berserker_savage_intervention(actor: Dictionary, party: Array, ally: Dictionary) -> bool:
+	if not berserker_tank_unlocked(actor, 40) or not berserker_has_melee_weapon(actor):
+		return false
+	if ally.is_empty() or ally == actor or int(ally.get("hp", 0)) <= 0 or not party.has(ally):
+		return false
+	if not use_combat_resource(actor, "berserker_savage_intervention", 10, 5):
+		return false
+	apply_combat_effect(ally, {"id": "berserker_savage_intervention", "kind": "redirect", "source_key": combatant_key(actor), "duration": 2})
+	add_log(str(actor.get("name", "Berserker")) + " prepares to intercept for " + str(ally.get("name", "ally")) + "!")
+	return true
+
+func berserker_consume_savage_intervention(ally: Dictionary, guardian: Dictionary) -> bool:
+	if not berserker_tank_unlocked(guardian, 40):
+		return false
+	var active: Array = ally.get("effects", [])
+	for i in range(active.size()):
+		var effect: Dictionary = active[i]
+		if str(effect.get("id", "")) == "berserker_savage_intervention" and str(effect.get("source_key", "")) == combatant_key(guardian):
+			active.remove_at(i)
+			ally["effects"] = active
+			return true
+	return false
+
+func berserker_savage_counterattack(actor: Dictionary, enemy: Dictionary) -> int:
+	if int(enemy.get("hp", 0)) <= 0:
+		return 0
+	var damage: int = maxi(1, int(ceil(float(roll_character_damage(actor)) * 1.50)))
+	damage = berserker_untouchable_damage(actor, berserker_brutal_challenge_damage(actor, damage))
+	damage_enemy(actor, enemy, damage, "counterattacks")
+	# damage_enemy contributes 1x; add 2x for 3x total.
+	add_threat(enemy, actor, float(damage), 2.0)
+	return damage
+
+func berserker_untouchable_on_dodge(actor: Dictionary) -> void:
+	if not berserker_tank_unlocked(actor, 50):
+		return
+	apply_combat_effect(actor, {"id": "berserker_untouchable_damage", "kind": "berserker_untouchable_damage", "value": 0.10, "duration": 3, "max_stacks": 3})
+	apply_combat_effect(actor, {"id": "berserker_untouchable_threat", "kind": "berserker_untouchable_threat", "value": 0.25, "duration": 3, "max_stacks": 3})
+	# Each dodge refreshes the full duration, including at stack cap.
+	for effect in actor.get("effects", []):
+		if str(effect.get("id", "")).begins_with("berserker_untouchable_"):
+			effect["duration"] = 3
+	add_log(str(actor.get("name", "Berserker")) + " gains Untouchable momentum!")
+
+func berserker_untouchable_damage(actor: Dictionary, damage: int) -> int:
+	return maxi(1, int(ceil(float(damage) * (1.0 + effects.total(actor, "berserker_untouchable_damage")))))
+
+func berserker_dance_of_carnage(actor: Dictionary) -> bool:
+	if not berserker_tank_unlocked(actor, 60) or not berserker_has_melee_weapon(actor):
+		return false
+	var living: Array = get_living_enemies()
+	if living.is_empty() or not use_combat_resource(actor, "berserker_dance_of_carnage", 25, 8):
+		return false
+	ensure_berserker_tank_presence(actor)
+	for enemy in living:
+		var damage: int = maxi(1, int(ceil(float(roll_character_damage(actor)) * 1.25)))
+		damage = berserker_untouchable_damage(actor, berserker_brutal_challenge_damage(actor, damage))
+		damage_enemy(actor, enemy, damage, "dances through")
+		add_threat(enemy, actor, float(damage), 2.0)
+	apply_combat_effect(actor, {"id": "berserker_dance_of_carnage", "kind": "berserker_dodge_bonus", "value": 0.20, "duration": 3})
+	add_log(str(actor.get("name", "Berserker")) + " unleashes Dance of Carnage!")
 	return true
