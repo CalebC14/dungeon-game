@@ -1798,10 +1798,10 @@ func complete_training_stat_choice(stat_choice: int):
 		+ " +1."
 	)
 
-	if str(member.get("class", "")) == "Warrior" and int(member.get("level", 1)) >= 9 and str(member.get("specialization", "")) == "":
+	if str(member.get("class", "")) in ["Warrior", "Paladin"] and int(member.get("level", 1)) >= 9 and str(member.get("specialization", "")) == "":
 		training_pending_member = member
 		training_choosing_specialization = true
-		training_message = "Choose a Warrior specialization to finish training."
+		training_message = "Choose a " + str(member.get("class", "")) + " specialization to finish training."
 
 	if not training_choosing_specialization:
 		training_pending_member = {}
@@ -2148,7 +2148,7 @@ var combat_pending_ability: String = ""
 var combat_target_page: int = 0
 
 func combat_skill_needs_target(ability_id: String) -> bool:
-	return ability_id in ["warrior_shield_bash", "warrior_taunt", "warrior_disarm"]
+	return ability_id in ["warrior_shield_bash", "warrior_taunt", "warrior_disarm", "paladin_shield_bash", "paladin_taunt"]
 
 func get_living_combat_targets() -> Array:
 	var available: Array = []
@@ -2177,6 +2177,13 @@ func get_combat_skill_options(actor: Dictionary) -> Array:
 	]
 	for entry in warrior_skills:
 		if combat.warrior_tank_unlocked(actor, int(entry[0])):
+			options.append({"name": entry[1], "id": entry[2], "cost": entry[3], "cooldown": entry[4], "shield": entry[5]})
+	var paladin_skills: Array = [
+		[10, "Shield Bash", "paladin_shield_bash", 0, 0, true],
+		[30, "Taunt", "paladin_taunt", 5, 4, false],
+	]
+	for entry in paladin_skills:
+		if combat.paladin_tank_unlocked(actor, int(entry[0])):
 			options.append({"name": entry[1], "id": entry[2], "cost": entry[3], "cooldown": entry[4], "shield": entry[5]})
 	return options
 
@@ -3914,8 +3921,8 @@ func draw_training_hall():
 	draw_header("THE TRAINING HALL")
 
 	if training_choosing_specialization and not training_pending_member.is_empty():
-		draw_string(ThemeDB.fallback_font, Vector2(80, 155), "WARRIOR SPECIALIZATION")
-		draw_string(ThemeDB.fallback_font, Vector2(80, 205), "1) TANK - Defender's Presence")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 155), str(training_pending_member.get("class", "")) + " SPECIALIZATION")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 205), "1) TANK - " + ("Sacred Guardian" if str(training_pending_member.get("class", "")) == "Paladin" else "Defender's Presence"))
 		draw_string(ThemeDB.fallback_font, Vector2(80, 255), "More specializations will be available later.")
 		draw_string(ThemeDB.fallback_font, Vector2(80, 355), training_message)
 		return

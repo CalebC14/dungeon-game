@@ -507,6 +507,7 @@ func resolve_party_action(
 		return
 
 	ensure_warrior_tank_presence(actor)
+	ensure_paladin_tank_presence(actor)
 	var selected_target: Dictionary = action_data.get("target", {})
 	var action_name = (
 		action_data["action"]
@@ -537,6 +538,10 @@ func resolve_party_action(
 				warrior_shield_wall(actor)
 			elif ability_id == "warrior_unbreakable_guardian":
 				warrior_unbreakable_guardian(actor, party)
+			elif ability_id == "paladin_shield_bash":
+				paladin_shield_bash(actor, selected_target)
+			elif ability_id == "paladin_taunt":
+				paladin_taunt(actor, selected_target)
 			else:
 				use_class_ability(actor, party)
 
@@ -1338,6 +1343,10 @@ func resolve_enemy_action(
 		damage = max(1, damage - 2)
 
 	damage = effects.mitigate(target, damage)
+	# Sacred Guardian is conditional on currently wearing a shield.
+	damage = paladin_sacred_guardian_mitigate(target, damage)
+	# Valiant Protector protects other party members, never the Paladin.
+	damage = paladin_valiant_protector_mitigate(original_target, damage, living_party)
 	if intercepted:
 		damage = maxi(1, int(ceil(float(damage) * 0.70)))
 		# Extra threat is applied to the attacker only, not all enemies.
@@ -1579,4 +1588,65 @@ func warrior_unbreakable_guardian(actor: Dictionary, party: Array) -> bool:
 			continue
 		apply_combat_effect(ally, {"id": "warrior_unbreakable_guardian", "kind": "redirect", "source_key": key, "duration": 2})
 	add_log(str(actor.get("name", "Warrior")) + " protects the party with Unbreakable Guardian!")
+	return true
+
+
+# ============================================================
+# PALADIN TANK — LEVELS 9, 10, 20, 30
+# ============================================================
+func paladin_tank_unlocked(actor: Dictionary, required_level: int) -> bool:
+	return str(actor.get("class", "")) == "Paladin" and str(actor.get("specialization", "")) == "tank" and int(actor.get("level", 1)) >= required_level
+
+func ensure_paladin_tank_presence(actor: Dictionary) -> void:
+	if not paladin_tank_unlocked(actor, 9):
+		return
+	for effect in actor.get("effects", []):
+		if str(effect.get("id", "")) == "paladin_sacred_guardian":
+			return
+	apply_combat_effect(actor, {"id": "paladin_sacred_guardian", "kind": "threat_multiplier", "value": 1.0, "duration": 999999})
+
+func paladin_sacred_guardian_mitigate(actor: Dictionary, damage: int) -> int:
+	if paladin_tank_unlocked(actor, 9) and has_equipped_shield(actor):
+		return maxi(1, int(ceil(float(damage) * 0.90)))
+	return damage
+
+func paladin_valiant_protector_mitigate(target: Dictionary, damage: int, party: Array, roll: float = -1.0) -> int:
+	for ally in party:
+		if ally == target or int(ally.get("hp", 0)) <= 0 or not paladin_tank_unlocked(ally, 20):
+			continue
+		var check = randf() if roll < 0.0 else roll
+		if check < 0.20:
+			add_log(str(ally.get("name", "Paladin")) + " protects " + str(target.get("name", "ally")) + "!")
+			return maxi(1, int(ceil(float(damage) * 0.75)))
+	return damage
+
+func paladin_shield_bash(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
+	if not paladin_tank_unlocked(actor, 10) or not has_equipped_shield(actor):
+		return false
+	var enemy = resolve_attack_target(selected_target)
+	if enemy.is_empty():
+		return false
+	ensure_paladin_tank_presence(actor)
+	var damage = maxi(1, roll_character_damage(actor))
+	damage_enemy(actor, enemy, damage, "shield bashes")
+	# 1x is granted by damage_enemy, add 2x for 3x total.
+	add_threat(enemy, actor, float(damage), 2.0)
+	return true
+
+func paladin_taunt(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
+	if not paladin_tank_unlocked(actor, 30):
+		return false
+	var enemy = resolve_attack_target(selected_target)
+	if enemy.is_empty():
+		return false
+	if not use_combat_resource(actor, "paladin_taunt", 5, 4):
+		return false
+	var table: Dictionary = enemy.get("threat", {})
+	var highest: float = 0.0
+	for value in table.values():
+		highest = maxf(highest, float(value))
+	var key = combatant_key(actor)
+	table[key] = maxf(float(table.get(key, 0.0)), highest * 1.10 + 1.0)
+	enemy["threat"] = table
+	add_log(str(actor.get("name", "Paladin")) + " taunts " + str(enemy.get("name", "enemy")) + "!")
 	return true
