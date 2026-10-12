@@ -32,6 +32,7 @@ const DATA = {
 	"locations": {
 		Vector2i(2, 4): {"type":"town", "town_id":"thornwake", "name":"Thornwake Gate"},
 		Vector2i(19, 19): {"type":"town", "town_id":"grayhaven", "name":"Grayhaven"},
-		Vector2i(2, 16): {"type":"dungeon", "dungeon_id":"broken_reliquary", "name":"The Broken Reliquary"}
+		Vector2i(2, 16): {"type":"dungeon", "dungeon_id":"broken_reliquary", "name":"The Broken Reliquary"},
+		Vector2i(20, 19): {"type":"zone_exit", "wilderness_id":"dreadmarch_wilderness", "name":"Eastern Road — Dreadmarch"}
 	}
 }

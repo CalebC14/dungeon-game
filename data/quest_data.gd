@@ -7,5 +7,7 @@ const GrayhavenQuests = preload("res://data/quests/grayhaven_quests.gd")
 const QUESTS = {
 	"rats_in_the_warehouse": ThornwakeQuests.QUESTS["rats_in_the_warehouse"],
 	"katys_special_vintage": ThornwakeQuests.QUESTS["katys_special_vintage"],
-	"queen_of_the_old_prison": GrayhavenQuests.QUESTS["queen_of_the_old_prison"]
+	"queen_of_the_old_prison": GrayhavenQuests.QUESTS["queen_of_the_old_prison"],
+	"purge_broken_reliquary": GrayhavenQuests.QUESTS["purge_broken_reliquary"],
+	"rescue_katy_thornwake": ThornwakeQuests.QUESTS["rescue_katy_thornwake"]
 }

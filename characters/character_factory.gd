@@ -27,6 +27,8 @@ static func make_blank_character() -> Dictionary:
 		"xp": 0,
 		"hp": 0,
 		"max_hp": 0,
+		"sp": 10,
+		"max_sp": 10,
 		"equipment": make_empty_equipment(),
 		"inventory": []
 	}

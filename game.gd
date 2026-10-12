@@ -192,6 +192,10 @@ func handle_inventory_input(event):
 # ============================================================
 
 var training_message: String = ""
+var training_pending_member: Dictionary = {}
+var training_pending_hp_gain: int = 0
+var training_pending_sp_gain: int = 0
+var training_choosing_stat: bool = false
 
 # ============================================================
 # INVENTORY UI
@@ -355,6 +359,23 @@ func apply_developer_action(action: String):
 			game_state = GameState.CITY
 			developer_menu_open = false
 
+		"travel_dreadmarch":
+			wilderness.reset_to_oldroot()
+			game_state = GameState.WILDERNESS
+			developer_menu_open = false
+
+		"travel_oldroot":
+			city.load_city("oldroot")
+			city.set_entry(Vector2i(0, 7), 1, "Developer travel: Oldroot.")
+			game_state = GameState.CITY
+			developer_menu_open = false
+
+		"travel_ironreach":
+			city.load_city("ironreach")
+			city.set_entry(Vector2i(0, 8), 1, "Developer travel: Ironreach.")
+			game_state = GameState.CITY
+			developer_menu_open = false
+
 		"dungeon_warehouse":
 			dev_enter_dungeon("abandoned_warehouse")
 		"dungeon_wine_cellar":
@@ -371,6 +392,16 @@ func apply_developer_action(action: String):
 			dev_enter_dungeon("old_prison_torture")
 		"dungeon_prison_morgue":
 			dev_enter_dungeon("old_prison_morgue")
+		"dungeon_reliquary_1":
+			dev_enter_dungeon("broken_reliquary_church")
+		"dungeon_reliquary_2":
+			dev_enter_dungeon("broken_reliquary_archives")
+		"dungeon_reliquary_3":
+			dev_enter_dungeon("broken_reliquary_catacombs_upper")
+		"dungeon_reliquary_4":
+			dev_enter_dungeon("broken_reliquary_catacombs_lower")
+		"dungeon_reliquary_5":
+			dev_enter_dungeon("broken_reliquary_chapel")
 
 		"quest_rats_start":
 			quest_system.set_state("rats_in_the_warehouse", "active")
@@ -414,7 +445,16 @@ func apply_developer_action(action: String):
 			developer_menu.message = "Test party loaded."
 		"give_reliquary_key":
 			add_quest_item("broken_reliquary_key")
-			developer_menu.message = "Broken Reliquary Key added."
+			quest_system.set_state("purge_broken_reliquary", "active")
+			developer_menu.message = "Broken Reliquary Key added; purge quest active."
+		"quest_bristle_defeated":
+			quest_system.set_state("purge_broken_reliquary", "bristle_defeated")
+			developer_menu.message = "Bristle-Aptarj marked defeated."
+
+		"unlock_dreadmarch":
+			quest_system.start_quest("rescue_katy_thornwake")
+			quest_system.set_state("rescue_katy_thornwake", "dreadmarch_unlocked")
+			developer_menu.message = "Dreadmarch route unlocked; Kazinov revealed."
 
 
 func dev_enter_dungeon(dungeon_id: String):
@@ -733,6 +773,11 @@ func handle_class_input(event):
 		class_data["name"]
 	)
 
+	# All new adventurers begin with a small shared SP pool.
+	# Class differences appear through SP gained on later levels.
+	character["max_sp"] = 10
+	character["sp"] = character["max_sp"]
+
 	game_state = GameState.CREATE_GENDER
 
 	queue_redraw()
@@ -1019,6 +1064,7 @@ func get_party_index(
 func reset_dungeon_for_adventure():
 
 	dungeon.reset()
+	dungeon.begin_expedition()
 
 	for member in party:
 		clear_temporary_combat_flags(member)
@@ -1158,10 +1204,15 @@ func activate_city_location():
 # ============================================================
 
 func enter_wilderness():
-	if city.city_id == "grayhaven":
-		wilderness.reset_to_grayhaven()
-	else:
-		wilderness.reset_to_thornwake()
+	match city.city_id:
+		"grayhaven":
+			wilderness.reset_to_grayhaven()
+		"oldroot":
+			wilderness.reset_to_oldroot()
+		"ironreach":
+			wilderness.reset_to_ironreach()
+		_:
+			wilderness.reset_to_thornwake()
 	game_state = GameState.WILDERNESS
 	queue_redraw()
 
@@ -1190,22 +1241,45 @@ func handle_wilderness_input(event):
 
 func activate_wilderness_location():
 	var location = wilderness.get_current_location()
-	if location.is_empty(): return
+	if location.is_empty():
+		return
+
 	match location.get("type", ""):
 		"town":
 			var town_id = location.get("town_id", "")
 			if city.load_city(town_id):
 				if town_id == "thornwake":
-					city.set_entry(Vector2i(16,12), 3, "You pass through Thornwake's east gate.")
+					city.set_entry(Vector2i(16, 12), 3, "You pass through Thornwake's east gate.")
 				elif town_id == "grayhaven":
-					city.set_entry(Vector2i(0,7), 1, "You pass through Grayhaven's west gate.")
+					city.set_entry(Vector2i(0, 7), 1, "You pass through Grayhaven's west gate.")
+				elif town_id == "oldroot":
+					city.set_entry(Vector2i(0, 7), 1, "You enter Oldroot from the Dreadmarch.")
+				elif town_id == "ironreach":
+					city.set_entry(Vector2i(0, 8), 1, "You pass beneath Ironreach's western gate.")
 				game_state = GameState.CITY
+
 		"dungeon":
 			if location.get("dungeon_id", "") == "broken_reliquary":
 				if has_quest_item("broken_reliquary_key"):
-					wilderness.message = "Harlic's key turns in the ancient lock. The Broken Reliquary is ready for its dungeon build."
+					if dungeon.load_dungeon("broken_reliquary_church"):
+						reset_dungeon_for_adventure()
+						game_state = GameState.DUNGEON
 				else:
-					wilderness.message = "A heavy iron lock seals the Broken Reliquary. You do not have its key."
+					wilderness.message = "The doors to the Broken Reliquary are locked shut."
+
+		"zone_exit":
+			var target = location.get("wilderness_id", "")
+			if target == "dreadmarch_wilderness":
+				if quest_system.get_state("rescue_katy_thornwake") == "dreadmarch_unlocked":
+					wilderness.reset_to_dreadmarch_west_gate()
+				else:
+					wilderness.message = "The eastern road is closed. Chief Warden Rorik Feld may know why."
+			elif target == "ashenwood_wilderness":
+				wilderness.reset_to_ashenwood_east_gate()
+
+		"fort_dread":
+			wilderness.message = "Fort Dread rises like a black tooth from the stone. Kazinov holds Katy somewhere beyond its walls. The fortress is not yet ready to enter."
+
 	queue_redraw()
 
 
@@ -1229,7 +1303,6 @@ func enter_town_hall():
 
 
 func handle_town_hall_input(event):
-
 	if not event.is_pressed() or event.is_echo():
 		return
 
@@ -1242,10 +1315,17 @@ func handle_town_hall_input(event):
 	if event.keycode != KEY_ENTER:
 		return
 
+	var rescue_state = quest_system.get_state("rescue_katy_thornwake")
+	if rescue_state == "katy_missing":
+		quest_system.set_state("rescue_katy_thornwake", "dreadmarch_unlocked")
+		queue_redraw()
+		return
+	if rescue_state == "dreadmarch_unlocked":
+		return
+
 	var rat_state = quest_system.get_state("rats_in_the_warehouse")
 
 	match rat_state:
-
 		"not_started":
 			quest_system.start_quest("rats_in_the_warehouse")
 
@@ -1270,12 +1350,26 @@ func handle_town_hall_input(event):
 
 
 func get_katy_dialogue() -> String:
+	var rescue_state = quest_system.get_state("rescue_katy_thornwake")
+	if rescue_state == "katy_missing":
+		return (
+			"Chief Warden Rorik Feld waits beside Katy's empty desk, travel dust still on his boots.\n\n"
+			+ "\"Katy was taken. The rider was Kazinov -- a Death Knight out of Fort Dread. "
+			+ "He has terrorized the eastern country for years, but this is the first time he has struck this far into Ashenwood.\"\n\n"
+			+ "Rorik points to the eastern road on a worn map. \"Cross into the Dreadmarch and make for Oldroot. "
+			+ "Ironreach lies farther southeast. Fort Dread stands north of it, hard against the Krual foothills.\""
+		)
+	if rescue_state == "dreadmarch_unlocked":
+		return (
+			"Rorik Feld keeps the eastern road marked on the map.\n\n"
+			+ "\"Oldroot is your first safe stop. From there, cross the Dreadmarch toward Ironreach. "
+			+ "Fort Dread lies north of the trading town. Find Kazinov. Bring Katy home.\""
+		)
 
 	var rat_state = quest_system.get_state("rats_in_the_warehouse")
 	var wine_state = quest_system.get_state("katys_special_vintage")
 
 	match rat_state:
-
 		"not_started":
 			return (
 				"Welcome to Thornwake. I'm Katy Thornwake.\n\n"
@@ -1284,57 +1378,33 @@ func get_katy_dialogue() -> String:
 				+ "If your company is looking for work, investigate the warehouse "
 				+ "and put an end to whatever is nesting there."
 			)
-
 		"active":
-			return (
-				"The rats are still coming from the abandoned warehouse.\n\n"
-				+ "Search it thoroughly. If there's a nest in there, "
-				+ "I want the source dealt with."
-			)
-
+			return "The rats are still coming from the abandoned warehouse.\n\nSearch it thoroughly. If there's a nest in there, I want the source dealt with."
 		"boss_defeated":
-			return (
-				"You cleared the warehouse? Good. Thornwake owes you a debt.\n\n"
-				+ "Take 100 gold for the work. "
-				+ "You've proven your company can be trusted."
-			)
-
+			return "You cleared the warehouse? Good. Thornwake owes you a debt.\n\nTake 100 gold for the work. You've proven your company can be trusted."
 		"completed":
 			match wine_state:
 				"active":
-					return (
-						"I do have another job for you. A less heroic one, perhaps.\n\n"
-						+ "I'm looking for a very particular bottle of wine. "
-						+ "The innkeeper believes one may still be in the old wine cellar "
-						+ "beneath the inn.\n\n"
-						+ "Speak with the innkeeper. Bring the bottle to me if you find it."
-					)
+					return "I do have another job for you. A less heroic one, perhaps.\n\nI'm looking for a very particular bottle of wine. The innkeeper believes one may still be in the old wine cellar beneath the inn.\n\nSpeak with the innkeeper. Bring the bottle to me if you find it."
 				"cellar_open":
-					return (
-						"The innkeeper has opened the cellar for you. "
-						+ "Find that bottle and bring it back to me."
-					)
+					return "The innkeeper has opened the cellar for you. Find that bottle and bring it back to me."
 				"wine_found":
-					return (
-						"You found it! And judging by the smell of you, "
-						+ "the cellar was more complicated than expected.\n\n"
-						+ "Take 250 gold. I suspect this will not be the last strange thing "
-						+ "we ask of your company."
-					)
+					return "You found it! And judging by the smell of you, the cellar was more complicated than expected.\n\nTake 250 gold. I suspect this will not be the last strange thing we ask of your company."
 				"completed":
-					return (
-						"Enjoy the quiet while it lasts. "
-						+ "Ashenwood has a habit of producing new troubles."
-					)
+					return "Enjoy the quiet while it lasts. Ashenwood has a habit of producing new troubles."
 
 	return "Katy Thornwake studies your company with interest."
 
 
 func get_katy_prompt() -> String:
+	var rescue_state = quest_system.get_state("rescue_katy_thornwake")
+	if rescue_state == "katy_missing":
+		return "[ENTER] ASK RORIK ABOUT KATY / OPEN EASTERN ROAD     [ESC] LEAVE"
+	if rescue_state == "dreadmarch_unlocked":
+		return "[ESC] LEAVE TOWN HALL"
 
 	var rat_state = quest_system.get_state("rats_in_the_warehouse")
 	var wine_state = quest_system.get_state("katys_special_vintage")
-
 	match rat_state:
 		"not_started":
 			return "[ENTER] ACCEPT: RATS IN THE WAREHOUSE     [ESC] LEAVE"
@@ -1343,7 +1413,6 @@ func get_katy_prompt() -> String:
 		"completed":
 			if wine_state == "wine_found":
 				return "[ENTER] GIVE KATY THE WINE / CLAIM REWARD     [ESC] LEAVE"
-
 	return "[ESC] LEAVE TOWN HALL"
 
 
@@ -1363,35 +1432,54 @@ func handle_warden_keep_input(event):
 		queue_redraw()
 		return
 	if event.keycode != KEY_ENTER: return
-	var state = quest_system.get_state("queen_of_the_old_prison")
-	if state == "not_started":
+
+	var prison_state = quest_system.get_state("queen_of_the_old_prison")
+	var reliquary_state = quest_system.get_state("purge_broken_reliquary")
+
+	if prison_state == "not_started":
 		quest_system.start_quest("queen_of_the_old_prison")
-	elif state == "onika_defeated" and has_quest_item("onikas_signet"):
+	elif prison_state == "onika_defeated" and has_quest_item("onikas_signet"):
 		remove_quest_item("onikas_signet")
 		quest_system.complete_quest("queen_of_the_old_prison")
 		progression.add_gold(500)
 		for member in party:
 			member["xp"] += 150
 		add_quest_item("broken_reliquary_key")
+		quest_system.start_quest("purge_broken_reliquary")
+	elif prison_state == "completed" and reliquary_state == "bristle_defeated":
+		quest_system.complete_quest("purge_broken_reliquary")
+		progression.add_gold(1000)
+		for member in party:
+			member["xp"] += 300
+		quest_system.start_quest("rescue_katy_thornwake")
+		quest_system.set_state("rescue_katy_thornwake", "katy_missing")
 	queue_redraw()
 
 func get_harlic_dialogue() -> String:
-	var state = quest_system.get_state("queen_of_the_old_prison")
-	match state:
-		"not_started":
-			return "Warden Harlic Dorn is a broad, scarred veteran in worn mail.\n\n\"The Old Prison belongs to bandits now. Onika calls herself their queen. I don't have enough wardens left to take four levels room by room.\"\n\n\"Kill Onika. Break her crew. Bring me proof she's dead.\""
-		"active":
-			return "Harlic rests both hands on the pommel of an old campaign sword.\n\n\"Onika is somewhere below the Guard Barracks. Don't underestimate her. She didn't earn that crown by being stupid.\""
-		"onika_defeated":
-			return "Harlic turns Onika's silver signet between two scarred fingers.\n\n\"So. The Bandit Queen is dead. Good work.\"\n\nHe pays the company 500 gold and awards each adventurer 150 XP. Then he sets an old black iron key on the table.\n\n\"This opens the Broken Reliquary out in Ashenwood. If you're looking for your next problem, you've found it.\""
-		"completed":
-			return "Harlic nods once. \"Grayhaven remembers what you did. The key to the Broken Reliquary is yours. Use it carefully.\""
-	return "Harlic watches the road from the keep."
+	var prison_state = quest_system.get_state("queen_of_the_old_prison")
+	var reliquary_state = quest_system.get_state("purge_broken_reliquary")
+	var rescue_state = quest_system.get_state("rescue_katy_thornwake")
+
+	if prison_state == "not_started":
+		return "Warden Harlic Dorn is a broad, scarred veteran in worn mail.\n\n\"The Old Prison belongs to bandits now. Onika calls herself their queen. I don't have enough wardens left to take four levels room by room.\"\n\n\"Kill Onika. Break her crew. Bring me proof she's dead.\""
+	if prison_state == "active":
+		return "Harlic rests both hands on the pommel of an old campaign sword.\n\n\"Onika is somewhere below the Guard Barracks. Don't underestimate her. She didn't earn that crown by being stupid.\""
+	if prison_state == "onika_defeated":
+		return "Harlic turns Onika's silver signet between two scarred fingers.\n\n\"So. The Bandit Queen is dead. Good work.\"\n\nHe pays the company 500 gold and awards each adventurer 150 XP. Then he sets an old black iron key on the table.\n\n\"This opens the Broken Reliquary out in Ashenwood. It was once a church of Tay'lore. Bristle-Aptarj turned it into a charnel house. My wardens sealed him in. Take the key. Go finish what we couldn't.\""
+	if reliquary_state == "active":
+		return "Harlic studies the old black iron key.\n\n\"The magic lock will know it. Once you're inside, expect the dead. Bristle-Aptarj tried to raise an army from those catacombs. Purge the church and make certain he never tries again.\""
+	if reliquary_state == "bristle_defeated":
+		return "Harlic listens without interrupting as you describe Bristle-Aptarj's fall.\n\n\"Then it's finally done. Ashenwood owes you more than it knows.\"\n\nHe awards the company 1,000 gold and 300 XP to each adventurer.\n\n\"You've done what my wardens could not. Go back to Thornwake. You've earned some rest.\""
+	if rescue_state == "katy_missing" or rescue_state == "dreadmarch_unlocked":
+		return "Harlic nods once. \"The Reliquary is finished. Whatever comes next, Grayhaven remembers what you did there.\""
+	return "Harlic nods once. \"Grayhaven remembers what you did.\""
 
 func get_harlic_prompt() -> String:
-	var state = quest_system.get_state("queen_of_the_old_prison")
-	if state == "not_started": return "[ENTER] ACCEPT: QUEEN OF THE OLD PRISON     [ESC] LEAVE"
-	if state == "onika_defeated": return "[ENTER] GIVE ONIKA'S SIGNET / CLAIM REWARD     [ESC] LEAVE"
+	var prison_state = quest_system.get_state("queen_of_the_old_prison")
+	var reliquary_state = quest_system.get_state("purge_broken_reliquary")
+	if prison_state == "not_started": return "[ENTER] ACCEPT: QUEEN OF THE OLD PRISON     [ESC] LEAVE"
+	if prison_state == "onika_defeated": return "[ENTER] GIVE ONIKA'S SIGNET / CLAIM REWARD     [ESC] LEAVE"
+	if reliquary_state == "bristle_defeated": return "[ENTER] REPORT BRISTLE-APTARJ'S DEATH / CLAIM REWARD     [ESC] LEAVE"
 	return "[ESC] LEAVE WARDEN KEEP"
 
 
@@ -1417,7 +1505,7 @@ func handle_inn_input(event):
 		queue_redraw()
 		return
 
-	if city.city_id == "grayhaven":
+	if city.city_id != "thornwake":
 		return
 
 	if event.keycode != KEY_ENTER:
@@ -1451,6 +1539,10 @@ func get_inn_dialogue() -> String:
 
 	if city.city_id == "grayhaven":
 		return "The Iron Lantern is quiet compared with Thornwake's inn. Prison guards, caravan hands, and off-duty wardens keep mostly to themselves. For now, it offers shelter and rumors rather than services."
+	if city.city_id == "oldroot":
+		return "The Old Root Inn is low-roofed and sturdy. Dreadmarch wind rattles the shutters while caravan hands trade news of ruined forts, dry ravines, and undead seen on the eastern roads."
+	if city.city_id == "ironreach":
+		return "The Marcher's Rest is crowded with traders, drovers, mercenaries, and travelers from across the Dreadmarch. Fort Dread is a frequent subject, but few speak Kazinov's name above a murmur."
 
 	if inn_message != "":
 		return inn_message
@@ -1481,7 +1573,7 @@ func get_inn_dialogue() -> String:
 
 func get_inn_prompt() -> String:
 
-	if city.city_id == "grayhaven":
+	if city.city_id != "thornwake":
 		return "[ESC] LEAVE INN"
 
 	var wine_state = quest_system.get_state("katys_special_vintage")
@@ -1584,116 +1676,180 @@ func handle_shop_input(event):
 # ============================================================
 
 func enter_training_hall():
-
-	training_message = (
-		"The masters examine your party."
-	)
-
+	training_pending_member = {}
+	training_pending_hp_gain = 0
+	training_pending_sp_gain = 0
+	training_choosing_stat = false
+	training_message = "The masters examine your party."
+	ensure_party_sp_fields()
 	game_state = GameState.TRAINING_HALL
-
 	queue_redraw()
 
 
 func handle_training_hall_input(event):
-
 	if not event.is_pressed() or event.is_echo():
 		return
 
-	if event.keycode == KEY_ESCAPE:
+	if training_choosing_stat:
+		if event.keycode == KEY_ESCAPE:
+			training_message = "Choose a stat to complete the level."
+			queue_redraw()
+			return
 
-		game_state = GameState.CITY
+		var stat_choice = number_key_to_index(event.keycode)
+		if stat_choice < 0 or stat_choice > 4:
+			return
 
-		city.set_message(
-			"You leave the Training Hall."
-		)
-
+		complete_training_stat_choice(stat_choice)
 		queue_redraw()
-
 		return
 
-	var choice = number_key_to_roster_index(
-		event.keycode
-	)
-
-	if choice == -1:
+	if event.keycode == KEY_ESCAPE:
+		game_state = GameState.CITY
+		city.set_message("You leave the Training Hall.")
+		queue_redraw()
 		return
 
-	if choice >= party.size():
+	var choice = number_key_to_roster_index(event.keycode)
+	if choice == -1 or choice >= party.size():
 		return
 
-	train_character(
-		party[choice]
-	)
-
+	train_character(party[choice])
 	queue_redraw()
 
 
-func train_character(
-	member: Dictionary
-):
+func train_character(member: Dictionary):
+	ensure_character_sp_fields(member)
 
-	var required_xp = (
-		get_xp_required_for_next_level(
-			member["level"]
-		)
-	)
-
+	var required_xp = get_xp_required_for_next_level(member["level"])
 	if member["xp"] < required_xp:
-
 		training_message = (
 			member["name"]
 			+ " needs "
 			+ str(required_xp - member["xp"])
 			+ " more XP to advance."
 		)
-
 		return
 
-	member["level"] += 1
+	var gains = get_level_gains(member.get("class", ""))
+	training_pending_member = member
+	training_pending_hp_gain = gains["hp"]
+	training_pending_sp_gain = gains["sp"]
+	training_choosing_stat = true
 
-	var hp_gain = (
-		2
-		+ int(member["con"] / 4)
+	training_message = (
+		member["name"]
+		+ " is ready for level "
+		+ str(member["level"] + 1)
+		+ ". Choose a stat to increase."
 	)
 
-	member["max_hp"] += hp_gain
+
+func complete_training_stat_choice(stat_choice: int):
+	if training_pending_member.is_empty():
+		training_choosing_stat = false
+		return
+
+	var stat_keys = ["str", "int", "dex", "con", "lck"]
+	var stat_names = ["STR", "INT", "DEX", "CON", "LCK"]
+	var stat_key = stat_keys[stat_choice]
+	var stat_name = stat_names[stat_choice]
+	var member = training_pending_member
+
+	member["level"] += 1
+	member["max_hp"] += training_pending_hp_gain
+	member["max_sp"] += training_pending_sp_gain
+	member[stat_key] += 1
 	member["hp"] = member["max_hp"]
+	member["sp"] = member["max_sp"]
 
 	training_message = (
 		member["name"]
 		+ " advances to level "
 		+ str(member["level"])
-		+ "!  Maximum HP increases by "
-		+ str(hp_gain)
-		+ "."
+		+ "!  HP +"
+		+ str(training_pending_hp_gain)
+		+ ", SP +"
+		+ str(training_pending_sp_gain)
+		+ ", "
+		+ stat_name
+		+ " +1."
 	)
 
+	training_pending_member = {}
+	training_pending_hp_gain = 0
+	training_pending_sp_gain = 0
+	training_choosing_stat = false
 
-func get_xp_required_for_next_level(
-	current_level: int
-) -> int:
 
+func get_level_gains(character_class: String) -> Dictionary:
+	match character_class:
+		"Warrior":
+			return {"hp": 10, "sp": 2}
+		"Paladin":
+			return {"hp": 9, "sp": 4}
+		"Berserker":
+			return {"hp": 11, "sp": 1}
+		"Hunter":
+			return {"hp": 8, "sp": 3}
+		"Rogue":
+			return {"hp": 7, "sp": 3}
+		"Bard":
+			return {"hp": 6, "sp": 6}
+		"Monk":
+			return {"hp": 8, "sp": 4}
+		"Shaman":
+			return {"hp": 6, "sp": 7}
+		"Druid":
+			return {"hp": 8, "sp": 6}
+		"Priest":
+			return {"hp": 6, "sp": 8}
+		"Conjurer":
+			return {"hp": 5, "sp": 10}
+		"Magician":
+			return {"hp": 4, "sp": 11}
+		"Warlock":
+			return {"hp": 5, "sp": 10}
+
+	return {"hp": 6, "sp": 4}
+
+
+func ensure_character_sp_fields(member: Dictionary):
+	if not member.has("max_sp"):
+		member["max_sp"] = 10
+	if not member.has("sp"):
+		member["sp"] = member["max_sp"]
+
+
+func ensure_party_sp_fields():
+	for member in party:
+		ensure_character_sp_fields(member)
+
+
+func get_xp_required_for_next_level(current_level: int) -> int:
 	match current_level:
-
 		1:
-			return 20
-
-		2:
 			return 50
-
+		2:
+			return 125
 		3:
-			return 100
-
+			return 250
 		4:
-			return 175
-
+			return 450
 		5:
-			return 275
+			return 700
+		6:
+			return 1000
+		7:
+			return 1400
+		8:
+			return 1900
+		9:
+			return 2500
 
-	return (
-		275
-		+ (current_level - 5) * 150
-	)
+	# From level 10 onward, each next level costs 750 more total XP
+	# than the previous threshold. This is intentionally simple for 1.0.
+	return 2500 + (current_level - 9) * 750
 
 
 # ============================================================
@@ -1789,6 +1945,9 @@ func check_dungeon_tile():
 		start_fixed_encounter(fixed_encounter)
 		return
 
+	if handle_current_dungeon_event():
+		return
+
 	var transition = dungeon.get_current_transition()
 
 	if not transition.is_empty() and not transition.get("requires_interact", false):
@@ -1810,6 +1969,13 @@ func activate_dungeon_transition():
 
 func perform_dungeon_transition(transition: Dictionary):
 
+	if transition.get("to_wilderness", false):
+		clear_all_combat_flags()
+		game_state = GameState.WILDERNESS
+		wilderness.message = "You step out of the Broken Reliquary into the Ashenwood."
+		queue_redraw()
+		return
+
 	if transition.get("to_city", false):
 		leave_dungeon(str(transition.get("to_city_id", "")))
 		return
@@ -1829,6 +1995,54 @@ func perform_dungeon_transition(transition: Dictionary):
 		dungeon.facing = transition["target_facing"]
 
 	queue_redraw()
+
+
+func handle_current_dungeon_event() -> bool:
+	var event = dungeon.get_current_event()
+	if event.is_empty():
+		return false
+
+	var event_type = str(event.get("type", "lore"))
+	dungeon.message = str(event.get("message", ""))
+
+	if event_type == "fountain":
+		for member in party:
+			if int(member.get("hp", 0)) > 0:
+				var hp_gain = max(1, int(ceil(float(member.get("max_hp", 1)) * 0.25)))
+				member["hp"] = min(int(member.get("max_hp", 1)), int(member.get("hp", 0)) + hp_gain)
+				if member.has("sp") and member.has("max_sp"):
+					var sp_gain = max(1, int(ceil(float(member["max_sp"]) * 0.25)))
+					member["sp"] = min(int(member["max_sp"]), int(member["sp"]) + sp_gain)
+		dungeon.message += " The party recovers 25% of maximum HP and SP."
+		dungeon.consume_current_event(true)
+		return true
+
+	if event_type == "treasure":
+		var gold = int(event.get("gold", 0))
+		var item_id = str(event.get("item_id", ""))
+		if item_id != "":
+			var receiver = add_item_to_first_available_party_member(item_id)
+			if receiver != "":
+				dungeon.message += " " + receiver + " takes the item."
+			else:
+				dungeon.message += " No one has room for the item, so the treasure remains here."
+				return true
+		if gold > 0:
+			progression.add_gold(gold)
+		dungeon.consume_current_event(false)
+		return true
+
+	dungeon.consume_current_event(false)
+	return true
+
+
+func add_item_to_first_available_party_member(item_id: String) -> String:
+	for member in party:
+		if int(member.get("hp", 0)) <= 0:
+			continue
+		if inventory_system.add_item(member, item_id):
+			return str(member.get("name", "An adventurer"))
+	return ""
 
 
 func check_for_encounter():
@@ -1938,6 +2152,10 @@ func handle_combat_input(event):
 
 			attempt_party_escape()
 
+		KEY_5:
+			if combat.warrior_tank_unlocked(actor, 10):
+				queue_current_action("Ability", "warrior_shield_bash")
+
 
 # ============================================================
 # COMBAT ACTION SELECTION
@@ -1957,7 +2175,8 @@ func get_current_combat_character() -> Dictionary:
 
 
 func queue_current_action(
-	action_name: String
+	action_name: String,
+	ability_id: String = ""
 ):
 
 	var actor = (
@@ -1972,7 +2191,8 @@ func queue_current_action(
 
 	combat.queue_action(
 		actor,
-		action_name
+		action_name,
+		ability_id
 	)
 
 	combat_character_index += 1
@@ -2066,6 +2286,16 @@ func handle_combat_victory():
 		dungeon.mark_current_fixed_encounter_defeated()
 		add_quest_item("onikas_signet")
 		quest_system.set_state("queen_of_the_old_prison", "onika_defeated")
+
+	if current_combat_tag == "grave_sacristan":
+		dungeon.mark_current_fixed_encounter_defeated()
+
+	if current_combat_tag == "sisters_bella_gigi":
+		dungeon.mark_current_fixed_encounter_defeated()
+
+	if current_combat_tag == "bristle_aptarj":
+		dungeon.mark_current_fixed_encounter_defeated()
+		quest_system.set_state("purge_broken_reliquary", "bristle_defeated")
 
 	last_combat_rewards = (
 		progression.award_combat_rewards(
@@ -3260,10 +3490,15 @@ func draw_town_hall():
 
 	draw_header("THORNWAKE TOWN HALL")
 
+	var town_hall_npc = "KATY THORNWAKE"
+	var rescue_state = quest_system.get_state("rescue_katy_thornwake")
+	if rescue_state == "katy_missing" or rescue_state == "dreadmarch_unlocked":
+		town_hall_npc = "CHIEF WARDEN RORIK FELD"
+
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(80, 125),
-		"KATY THORNWAKE",
+		town_hall_npc,
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		22
@@ -3306,6 +3541,10 @@ func draw_warden_keep():
 	for i in range(lines.size()):
 		draw_string(ThemeDB.fallback_font, Vector2(90,175 + i * 28), lines[i])
 	draw_string(ThemeDB.fallback_font, Vector2(80,470), "QUEST: " + quest_system.get_display_status("queen_of_the_old_prison"))
+	if quest_system.is_started("purge_broken_reliquary"):
+		draw_string(ThemeDB.fallback_font, Vector2(80,495), "QUEST: " + quest_system.get_display_status("purge_broken_reliquary"))
+	if quest_system.is_started("rescue_katy_thornwake"):
+		draw_string(ThemeDB.fallback_font, Vector2(80,520), "NEW QUEST: " + quest_system.get_display_status("rescue_katy_thornwake"))
 	draw_string(ThemeDB.fallback_font, Vector2(80,555), get_harlic_prompt())
 
 
@@ -3314,7 +3553,7 @@ func draw_inn():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(80, 90),
-		("THE IRON LANTERN INN" if city.city_id == "grayhaven" else "THE WAYFARER'S INN"),
+		str(city.get_current_location().get("name", "Inn")).to_upper(),
 		HORIZONTAL_ALIGNMENT_LEFT,
 		-1,
 		28
@@ -3569,72 +3808,48 @@ func draw_inventory_screen():
 # ============================================================
 
 func draw_training_hall():
+	draw_header("THE TRAINING HALL")
 
-	draw_header(
-		"THE TRAINING HALL"
-	)
+	if training_choosing_stat and not training_pending_member.is_empty():
+		var member = training_pending_member
+		draw_string(ThemeDB.fallback_font, Vector2(80, 125), member["name"] + " is ready to advance.")
+		draw_string(ThemeDB.fallback_font, Vector2(80, 165), "LEVEL " + str(member["level"]) + " -> " + str(member["level"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(80, 200), "MAX HP  +" + str(training_pending_hp_gain))
+		draw_string(ThemeDB.fallback_font, Vector2(80, 230), "MAX SP  +" + str(training_pending_sp_gain))
+		draw_string(ThemeDB.fallback_font, Vector2(80, 280), "CHOOSE A STAT TO INCREASE:")
+		draw_string(ThemeDB.fallback_font, Vector2(100, 320), "1) STR   " + str(member["str"]) + " -> " + str(member["str"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(100, 350), "2) INT   " + str(member["int"]) + " -> " + str(member["int"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(100, 380), "3) DEX   " + str(member["dex"]) + " -> " + str(member["dex"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(100, 410), "4) CON   " + str(member["con"]) + " -> " + str(member["con"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(100, 440), "5) LCK   " + str(member["lck"]) + " -> " + str(member["lck"] + 1))
+		draw_string(ThemeDB.fallback_font, Vector2(80, 500), training_message)
+		draw_string(ThemeDB.fallback_font, Vector2(80, 555), "[1-5] CHOOSE STAT")
+		return
 
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 125),
-		"Veteran instructors judge whether each adventurer is ready to advance."
-	)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 125), "Veteran instructors judge whether each adventurer is ready to advance.")
 
-	for i in range(
-		party.size()
-	):
-
+	for i in range(party.size()):
 		var member = party[i]
-
-		var required_xp = (
-			get_xp_required_for_next_level(
-				member["level"]
-			)
-		)
-
+		ensure_character_sp_fields(member)
+		var required_xp = get_xp_required_for_next_level(member["level"])
 		var status = "READY"
-
 		if member["xp"] < required_xp:
-
-			status = (
-				str(member["xp"])
-				+ "/"
-				+ str(required_xp)
-				+ " XP"
-			)
+			status = str(member["xp"]) + "/" + str(required_xp) + " XP"
 
 		var text = (
 			str(i + 1)
-			+ ") "
-			+ member["name"]
-			+ "   "
-			+ member["class"]
-			+ "   LV "
-			+ str(member["level"])
-			+ "   "
-			+ status
+			+ ") " + member["name"]
+			+ "   " + member["class"]
+			+ "   LV " + str(member["level"])
+			+ "   HP " + str(member["hp"]) + "/" + str(member["max_hp"])
+			+ "   SP " + str(member["sp"]) + "/" + str(member["max_sp"])
+			+ "   " + status
 		)
 
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				100,
-				175 + i * 38
-			),
-			text
-		)
+		draw_string(ThemeDB.fallback_font, Vector2(100, 175 + i * 38), text)
 
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 445),
-		training_message
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 555),
-		"[1-6] TRAIN CHARACTER     [ESC] RETURN TO CITY"
-	)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 445), training_message)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 555), "[1-6] TRAIN CHARACTER     [ESC] RETURN TO CITY")
 
 
 
@@ -4246,6 +4461,20 @@ func draw_party_panel():
 # DUNGEON STATUS
 # ============================================================
 
+func wrap_ui_text(text: String, max_chars: int) -> Array[String]:
+	var lines: Array[String] = []
+	var current = ""
+	for word in text.split(" "):
+		var candidate = word if current == "" else current + " " + word
+		if candidate.length() > max_chars and current != "":
+			lines.append(current)
+			current = word
+		else:
+			current = candidate
+	if current != "":
+		lines.append(current)
+	return lines
+
 func draw_status():
 
 	draw_string(
@@ -4273,12 +4502,21 @@ func draw_status():
 
 	draw_string(
 		ThemeDB.fallback_font,
-		Vector2(
-			780,
-			130
-		),
-		"[G] LEAVE DUNGEON     [I] INVENTORY"
+		Vector2(780, 130),
+		"[I] INVENTORY" + ("     [G] LEAVE DUNGEON" if dungeon.dungeon_id == "abandoned_warehouse" else "")
 	)
+
+	if dungeon.message != "":
+		var message_lines = wrap_ui_text(dungeon.message, 44)
+		for i in range(min(3, message_lines.size())):
+			draw_string(
+				ThemeDB.fallback_font,
+				Vector2(780, 158 + i * 16),
+				message_lines[i],
+				HORIZONTAL_ALIGNMENT_LEFT,
+				340,
+				13
+			)
 
 
 # ============================================================
@@ -4503,6 +4741,9 @@ func draw_combat_action_menu():
 		),
 		"4) RUN"
 	)
+
+	if combat.warrior_tank_unlocked(actor, 10):
+		draw_string(ThemeDB.fallback_font, Vector2(80, 400), "5) SHIELD BASH (shield required)")
 
 
 func get_class_ability_name(

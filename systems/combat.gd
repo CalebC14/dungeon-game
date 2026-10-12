@@ -17,6 +17,11 @@ var song_of_courage_active: bool = false
 
 var inventory_system = InventorySystem.new()
 
+# Encounter-local mechanics. All state lives on existing combatant dictionaries.
+const CombatEffects = preload("res://systems/combat_effects.gd")
+var effects = CombatEffects.new()
+var next_combat_key: int = 1
+
 const BASE_HIT_CHANCE: float = 0.65
 const BASE_AVOIDANCE: float = 0.05
 const MIN_HIT_CHANCE: float = 0.10
@@ -237,7 +242,9 @@ func create_enemy_from_data(
 		"gold_min": enemy_data["gold_min"],
 		"gold_max": enemy_data["gold_max"],
 
-		"tags": enemy_data["tags"].duplicate()
+		"tags": enemy_data["tags"].duplicate(),
+		"threat": {},
+		"effects": []
 	}
 
 
@@ -387,12 +394,14 @@ func clear_actions() -> void:
 
 func queue_action(
 	character: Dictionary,
-	action_name: String
+	action_name: String,
+	ability_id: String = ""
 ) -> void:
 
 	party_actions.append({
 		"actor": character,
-		"action": action_name
+		"action": action_name,
+		"ability_id": ability_id
 	})
 
 
@@ -465,6 +474,8 @@ func resolve_round(
 				party
 			)
 
+	for combatant in party + enemies:
+		effects.tick(combatant)
 	party_actions.clear()
 
 	round_number += 1
@@ -484,6 +495,7 @@ func resolve_party_action(
 	if actor["hp"] <= 0:
 		return
 
+	ensure_warrior_tank_presence(actor)
 	var action_name = (
 		action_data["action"]
 	)
@@ -504,10 +516,11 @@ func resolve_party_action(
 
 		"Ability":
 
-			use_class_ability(
-				actor,
-				party
-			)
+			var ability_id: String = str(action_data.get("ability_id", ""))
+			if ability_id == "warrior_shield_bash":
+				warrior_shield_bash(actor)
+			else:
+				use_class_ability(actor, party)
 
 
 # ============================================================
@@ -1171,6 +1184,8 @@ func damage_enemy(
 		+ " damage."
 	)
 
+	add_threat(target, actor, float(damage))
+	effects.fire_trigger(actor, "damage_dealt", {"target": target, "damage": damage})
 	if target["hp"] <= 0:
 
 		add_log(
@@ -1261,7 +1276,10 @@ func resolve_enemy_action(
 	if living_party.is_empty():
 		return
 
-	var target = living_party.pick_random()
+	if effects.has_control(enemy, "stun"):
+		add_log(enemy["name"] + " is stunned.")
+		return
+	var target = select_enemy_target(enemy, living_party)
 	var hit_chance = get_enemy_hit_chance(enemy, target)
 
 	if randf() > hit_chance:
@@ -1288,7 +1306,13 @@ func resolve_enemy_action(
 	if target.get("warded", false):
 		damage = max(1, damage - 2)
 
+	damage = effects.mitigate(target, damage)
+	var recipient = effects.redirect_target(target, living_party)
+	if recipient != target:
+		damage = effects.mitigate(recipient, damage)
+		target = recipient
 	target["hp"] -= damage
+	effects.fire_trigger(target, "damage_taken", {"source": enemy, "damage": damage})
 
 	if target["hp"] < 0:
 		target["hp"] = 0
@@ -1344,3 +1368,102 @@ func cleanup_round(
 		member["defending"] = false
 		member["guarded"] = false
 		member["warded"] = false
+
+
+# ============================================================
+# SHARED TANK COMBAT FOUNDATIONS
+# ============================================================
+
+func combatant_key(actor: Dictionary) -> String:
+	# Runtime instance identity; names are not necessarily unique.
+	if not actor.has("combat_key"):
+		actor["combat_key"] = str(next_combat_key)
+		next_combat_key += 1
+	return str(actor["combat_key"])
+
+func add_threat(enemy: Dictionary, actor: Dictionary, amount: float, multiplier: float = 1.0) -> void:
+	var table: Dictionary = enemy.get("threat", {})
+	var key = combatant_key(actor)
+	table[key] = maxf(0.0, float(table.get(key, 0.0)) + amount * multiplier * effects.threat_multiplier(actor))
+	enemy["threat"] = table
+
+func add_threat_from_damage(actor: Dictionary, damage: int, multiplier: float = 1.0) -> void:
+	for enemy in enemies:
+		if int(enemy.get("hp", 0)) > 0:
+			add_threat(enemy, actor, float(damage), multiplier)
+
+func select_enemy_target(enemy: Dictionary, living_party: Array) -> Dictionary:
+	var forced_key = effects.forced_target(enemy)
+	for member in living_party:
+		if int(member.get("hp", 0)) > 0 and combatant_key(member) == forced_key:
+			return member
+	var best: Dictionary = {}
+	var highest = -1.0
+	var table: Dictionary = enemy.get("threat", {})
+	for member in living_party:
+		if int(member.get("hp", 0)) <= 0:
+			continue
+		var score = float(table.get(combatant_key(member), 0.0))
+		if score > highest:
+			highest = score
+			best = member
+	return best
+
+func apply_combat_effect(target: Dictionary, effect: Dictionary) -> bool:
+	return effects.apply(target, effect)
+
+func use_combat_resource(actor: Dictionary, ability_id: String, sp_cost: int, cooldown: int) -> bool:
+	if sp_cost < 0 or cooldown < 0 or int(actor.get("sp", 0)) < sp_cost or effects.cooldown_remaining(actor, ability_id) > 0:
+		return false
+	actor["sp"] = int(actor.get("sp", 0)) - sp_cost
+	effects.set_cooldown(actor, ability_id, cooldown)
+	return true
+
+
+# ============================================================
+# WARRIOR TANK: FIRST PLAYABLE SLICE
+# ============================================================
+
+func is_warrior_tank(actor: Dictionary) -> bool:
+	return str(actor.get("class", "")) == "Warrior" and str(actor.get("specialization", "")) == "tank"
+
+func warrior_tank_unlocked(actor: Dictionary, required_level: int) -> bool:
+	return is_warrior_tank(actor) and int(actor.get("level", 1)) >= required_level
+
+func has_equipped_shield(actor: Dictionary) -> bool:
+	var off_hand = actor.get("equipment", {}).get("off_hand", null)
+	if typeof(off_hand) != TYPE_STRING:
+		return false
+	if not ItemData.ITEMS.has(off_hand):
+		return false
+	var item: Dictionary = ItemData.ITEMS[off_hand]
+	return str(item.get("slot", "")) == "off_hand" and "shield" in str(item.get("name", "")).to_lower()
+
+func ensure_warrior_tank_presence(actor: Dictionary) -> void:
+	if not warrior_tank_unlocked(actor, 9):
+		return
+	var present = false
+	for effect in actor.get("effects", []):
+		if str(effect.get("id", "")) == "warrior_defenders_presence":
+			present = true
+			break
+	if not present:
+		apply_combat_effect(actor, {"id": "warrior_defenders_presence", "kind": "threat_multiplier", "value": 1.0, "duration": 999999})
+	# Shield block bonus is read by future block-resolution integration.
+
+func warrior_shield_bash(actor: Dictionary) -> bool:
+	if not warrior_tank_unlocked(actor, 10):
+		return false
+	if not has_equipped_shield(actor):
+		add_log(actor.get("name", "Warrior") + " needs a shield for Shield Bash.")
+		return false
+	var enemy = get_first_living_enemy()
+	if enemy.is_empty():
+		return false
+	ensure_warrior_tank_presence(actor)
+	var damage = maxi(1, roll_character_damage(actor))
+	damage_enemy(actor, enemy, damage, "shield bashes")
+	# damage_enemy already adds baseline threat, so add only the
+	# remaining 2x to reach 3x total (before passive multipliers).
+	add_threat(enemy, actor, float(damage), 2.0)
+	return true

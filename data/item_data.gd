@@ -16,5 +16,10 @@ const ITEMS = {
 	"lucky_charm": {"id":"lucky_charm","name":"Lucky Charm","type":"equipment","slot":"trinket","value":75,"accuracy":0.02,"avoidance":0.02,"absorption":0,"allowed_classes":[]},
 	"healing_potion": {"id":"healing_potion","name":"Healing Potion","type":"consumable","value":20,"effect":"heal","power":12},
 	"antidote": {"id":"antidote","name":"Antidote","type":"consumable","value":15,"effect":"cure_poison","power":0},
-	"old_key": {"id":"old_key","name":"Old Iron Key","type":"misc","value":0}
+	"old_key": {"id":"old_key","name":"Old Iron Key","type":"misc","value":0},
+	"sun_touched_sword": {"id":"sun_touched_sword","name":"Sun-Touched Sword","type":"equipment","slot":"weapon","value":120,"damage_min":3,"damage_max":7,"accuracy":0.07,"avoidance":0.0,"absorption":0,"allowed_classes":["Warrior","Paladin","Berserker","Rogue","Hunter","Bard"]},
+	"blessed_chain": {"id":"blessed_chain","name":"Blessed Chain Shirt","type":"equipment","slot":"body","value":150,"accuracy":0.0,"avoidance":-0.01,"absorption":5,"allowed_classes":["Warrior","Paladin","Berserker","Priest"]},
+	"dawn_ward": {"id":"dawn_ward","name":"Dawn Ward","type":"equipment","slot":"off_hand","value":135,"accuracy":0.0,"avoidance":0.05,"absorption":3,"allowed_classes":["Warrior","Paladin","Priest","Shaman","Druid"]},
+	"sun_priest_ring": {"id":"sun_priest_ring","name":"Sun Priest's Ring","type":"equipment","slot":"accessory","value":180,"accuracy":0.02,"avoidance":0.03,"absorption":0,"allowed_classes":[]},
+	"holy_symbol_taylore": {"id":"holy_symbol_taylore","name":"Holy Symbol of Tay'lore","type":"equipment","slot":"trinket","value":0,"accuracy":0.02,"avoidance":0.05,"absorption":1,"allowed_classes":[]}
 }

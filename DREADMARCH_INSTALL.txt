@@ -1,0 +1,30 @@
+DREADMARCH ZONE 2 BUILD
+
+Copy this archive's contents over the project root (~/dungeon-game).
+
+Adds:
+- The Dreadmarch wilderness zone
+- Oldroot (first western town) with Inn, Training Hall, Temple, General Store
+- Ironreach in the southeast as the zone's largest town shell
+- Fort Dread landmark northeast of Ironreach
+- Ashenwood <-> Dreadmarch transition
+- Rorik Feld / Kazinov kidnapping progression
+- Dreadmarch wilderness encounters
+- Developer travel shortcuts
+
+Story flow:
+1. Defeat Bristle-Aptarj.
+2. Report to Harlic for the Reliquary reward.
+3. Return to Thornwake Town Hall. Rorik Feld explains Katy's kidnapping.
+4. Press Enter during Rorik's dialogue to unlock the eastern road.
+5. In Ashenwood, travel to the east-road location near Grayhaven and press Enter.
+6. Enter the Dreadmarch; Oldroot is the first town.
+
+Developer shortcuts:
+F12 menu
+F6 Dreadmarch
+F7 Oldroot
+F8 Ironreach
+M  Unlock Dreadmarch / reveal Kazinov
+
+Fort Dread is intentionally a landmark/locked content hook in this build; its dungeon interior comes next.
