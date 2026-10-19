@@ -24,7 +24,7 @@ const DATA = {
 	},
 	"interactions": {
 		Vector2i(2,11): {"id":"warehouse_brass_key", "type":"key", "name":"Warehouse brass key", "key_id":"warehouse_brass_key"},
-		Vector2i(7,10): {"id":"warehouse_store_door", "type":"locked_door", "name":"Warehouse store door", "key_id":"warehouse_brass_key", "key_name":"Warehouse brass key"},
+		Vector2i(7,10): {"id":"warehouse_store_door", "type":"locked_door", "name":"Warehouse store door", "pickable":true, "key_id":"warehouse_brass_key", "key_name":"Warehouse brass key"},
 		Vector2i(7,9): {"id":"warehouse_shortcut_lever", "type":"lever", "name":"Cross-passage lever", "opens":["warehouse_cross_passage"], "message":"The lever lowers. A panel slides open in the west wall, connecting the two storage corridors."},
 		Vector2i(6,9): {"id":"warehouse_cross_passage", "type":"shortcut", "name":"Warehouse cross-passage"}
 	}

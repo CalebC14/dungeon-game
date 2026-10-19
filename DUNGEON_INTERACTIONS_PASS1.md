@@ -26,7 +26,7 @@ shortcut and class skill test objects remain available.
 Enter interacts with the object directly ahead, falling back to the current
 tile. The brass key uses the existing shared party quest-item keyring and is
 reusable. Picking it up removes its map marker; it cannot be farmed or sold.
-The door stays locked without it and remains open after unlocking. Pulling the
+The door remains open after unlocking with the key or successfully picking the lock. Pulling the
 lever opens the cross-passage permanently; repeated pulls do not toggle it shut.
 
 Closed barriers block movement in either direction. Open barriers behave as
@@ -56,14 +56,24 @@ saved location, so loading while standing on an open door or shortcut works.
 Malformed interaction state leaves the current game unchanged.
 
 This first pass uses explicit key-based doors and one-way lever activation.
-Rogue lockpicking for real doors, consumable keys, toggling mechanisms, multi-step
-puzzles, and secret-door discovery remain separate extensions.
+Consumable keys, toggling mechanisms, multi-step puzzles, and secret-door discovery remain separate extensions.
 
 ## Validation
 
-Godot 4.7.2: all 26 tests pass, including the prior 24 regression suites. New
+Godot 4.7.2: all 27 test suites pass. New
 tests cover key pickup, missing keys, barrier movement, reusable keys, lever
 activation, idempotence, shorter path distance, persistence, opened-tile saves,
 older saves, malformed state, and compatibility with skill interactions.
 Headless startup passes. Native Godot renders of the closed door, key, lever,
 and opened shortcut were checked visually.
+
+## Rogue alternative
+
+At `(7,11)`, face north and press R to open Rogue Skills, select Pick Lock,
+and press Enter. The same target appears in the K class menu. Doors must
+explicitly opt in with `pickable: true`.
+
+The existing 70% chance and one attempt per character per object apply. Success
+opens the passage without gold or a key. Failure causes no damage and leaves
+the key route available. Already-open doors consume no attempt. Door state and
+attempt history survive save/load, including saves on the picked door tile.

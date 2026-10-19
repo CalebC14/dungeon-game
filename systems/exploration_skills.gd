@@ -45,9 +45,11 @@ static func unavailable_reason(party: PartySystem, dungeon: DungeonSystem, actor
 	for effect in actor.get("effects", []):
 		if effect.get("kind", "") == "control" and effect.get("id", "") in ["stun", "paralysis", "petrify"]:
 			return "This character cannot act."
-	var object = dungeon.get_exploration_object()
+	var object = dungeon.get_skill_target()
 	if object.is_empty() or object.get("skill", "") != skill:
 		return "No matching exploration target on this tile."
+	if object.get("type", "") == "locked_door" and DungeonInteractions.is_open(dungeon, object):
+		return "This door is already open."
 	var state: Dictionary = dungeon.rogue_attempts.get(object_key(dungeon, object), {})
 	if bool(state.get("resolved", false)):
 		return "This object has already been resolved."
@@ -61,7 +63,7 @@ static func attempt(party: PartySystem, dungeon: DungeonSystem, actor: Dictionar
 		return {"attempted": false, "message": reason}
 	if test_roll < 0 or test_roll > 100:
 		return {"attempted": false, "message": "Invalid roll."}
-	var object = dungeon.get_exploration_object()
+	var object = dungeon.get_skill_target()
 	var key = object_key(dungeon, object)
 	var state: Dictionary = dungeon.rogue_attempts.get(key, {"resolved": false, "attempts": []})
 	state["attempts"].append(actor["character_id"])
@@ -69,6 +71,8 @@ static func attempt(party: PartySystem, dungeon: DungeonSystem, actor: Dictionar
 	state["resolved"] = success
 	dungeon.rogue_attempts[key] = state
 	if success:
+		if object.get("type", "") == "locked_door":
+			dungeon.interaction_states[DungeonInteractions.state_key(dungeon, object)] = {"open": true}
 		return {"attempted": true, "success": true, "gold": int(object.get("reward_gold", 0)), "message": str(actor["name"]) + " succeeds at " + str(SKILLS[skill]["name"]) + ". " + str(object.get("success_message", "Object resolved."))}
 	var damage = 0
 	var failure_damage = int(object.get("failure_damage", 4 if skill == "disarm_trap" else 0))

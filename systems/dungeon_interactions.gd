@@ -35,7 +35,8 @@ static func describe(dungeon, keys: Dictionary) -> String:
 		"locked_door":
 			if is_open(dungeon, object):
 				return name_text + " is open."
-			return name_text + (". [Enter] Unlock with key." if bool(keys.get(object.get("key_id", ""), false)) else " is locked. Find the " + str(object.get("key_name", "key")) + ".")
+			var hint = name_text + (". [Enter] Unlock with key." if bool(keys.get(object.get("key_id", ""), false)) else " is locked. Find the " + str(object.get("key_name", "key")) + ".")
+			return hint + (" [R] Pick Lock." if bool(object.get("pickable", false)) else "")
 		"lever":
 			if bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("used", false)):
 				return name_text + " is down. The shortcut is open."
@@ -61,7 +62,7 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 			if is_open(dungeon, object):
 				return {"handled": true, "message": name_text + " is already open."}
 			if not bool(keys.get(object.get("key_id", ""), false)):
-				return {"handled": true, "message": "Locked. You need the " + str(object.get("key_name", "key")) + "."}
+				return {"handled": true, "message": "Locked. You need the " + str(object.get("key_name", "key")) + "." + (" [R] Pick Lock is an alternative." if bool(object.get("pickable", false)) else "")}
 			dungeon.interaction_states[key] = {"open": true}
 			return {"handled": true, "message": "Unlocked " + name_text + ". The key remains in your keyring."}
 		"lever":

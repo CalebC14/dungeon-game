@@ -185,3 +185,15 @@ func find_interaction(id: String) -> Dictionary:
 		if object.get("id", "") == id:
 			return object
 	return {}
+
+# Real pickable doors share skill validation with the optional test objects.
+func get_skill_target() -> Dictionary:
+	var interaction = DungeonInteractions.target(self)
+	if interaction.get("type", "") == "locked_door" and bool(interaction.get("pickable", false)):
+		var target = interaction.duplicate(true)
+		target["skill"] = "pick_lock"
+		target["reward_gold"] = 0
+		target["failure_damage"] = 0
+		target["success_message"] = "The door opens."
+		return target
+	return get_exploration_object()

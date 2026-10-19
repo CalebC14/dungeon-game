@@ -4949,7 +4949,7 @@ func draw_rogue_skills():
 		rogue_character_index = clampi(rogue_character_index, 0, rogues.size() - 1)
 		actor = rogues[rogue_character_index]
 	draw_string(ThemeDB.fallback_font, Vector2(60, 125), "Rogue: " + str(actor.get("name", "No active Rogue in the party")))
-	var object = dungeon.get_rogue_object()
+	var object = dungeon.get_skill_target()
 	draw_string(ThemeDB.fallback_font, Vector2(60, 165), "Target: " + str(object.get("name", "No lock or trap on this tile")))
 	draw_string(ThemeDB.fallback_font, Vector2(80, 225), ("> " if rogue_selected_skill == "pick_lock" else "  ") + "1) Pick Lock")
 	draw_string(ThemeDB.fallback_font, Vector2(80, 265), ("> " if rogue_selected_skill == "disarm_trap" else "  ") + "2) Disarm Trap")
@@ -5035,7 +5035,7 @@ func draw_class_skills():
 		draw_string(ThemeDB.fallback_font, Vector2(60, 540), "[Left/Right] Character   [Esc] Back")
 		return
 	class_skill_index = clampi(class_skill_index, 0, skills.size() - 1)
-	var object = dungeon.get_exploration_object() if stable_save_state() == GameState.DUNGEON else {}
+	var object = dungeon.get_skill_target() if stable_save_state() == GameState.DUNGEON else {}
 	draw_string(ThemeDB.fallback_font, Vector2(60, 165), "Target: " + str(object.get("name", "No exploration target here")))
 	for i in range(skills.size()):
 		draw_string(ThemeDB.fallback_font, Vector2(80, 225 + i * 40), ("> " if i == class_skill_index else "  ") + str(i + 1) + ") " + str(ExplorationSkills.SKILLS[skills[i]]["name"]))
