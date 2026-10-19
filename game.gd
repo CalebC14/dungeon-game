@@ -62,11 +62,20 @@ var developer_menu_open: bool = false
 # ROSTER / PARTY
 # ============================================================
 
-var roster: Array = []
-var party: Array = []
+const PartyScript = preload("res://systems/party.gd")
+var party_system = PartyScript.new()
+var roster: Array:
+	get:
+		return party_system.roster
+var party: Array:
+	get:
+		return party_system.active_members()
+var roster_page: int = 0
+var selected_formation_slot: int = 0
+var party_message: String = ""
+const ROSTER_PAGE_SIZE = 9
 
 const MAX_PARTY_SIZE = 6
-const MAX_ROSTER_SIZE = 20
 
 
 # ============================================================
@@ -449,9 +458,11 @@ func apply_developer_action(action: String):
 			progression.add_gold(1000)
 			developer_menu.message = "+1000 party gold."
 		"load_test_party":
-			party = TestParty.create()
-			roster = party.duplicate()
-			developer_menu.message = "Test party loaded."
+			if is_at_guild():
+				load_test_roster()
+				developer_menu.message = "Test party loaded."
+			else:
+				developer_menu.message = "Return to the Guild to replace the party."
 		"give_reliquary_key":
 			add_quest_item("broken_reliquary_key")
 			quest_system.set_state("purge_broken_reliquary", "active")
@@ -484,17 +495,16 @@ func handle_guild_input(event):
 	if not event.is_pressed() or event.is_echo():
 		return
 
+	if handle_roster_paging(event):
+		return
+
 	match event.keycode:
 
 		KEY_C:
 
-			if roster.size() < MAX_ROSTER_SIZE:
-
-				reset_character_creator()
-
-				game_state = GameState.CREATE_RACE
-
-				queue_redraw()
+			reset_character_creator()
+			game_state = GameState.CREATE_RACE
+			queue_redraw()
 
 		KEY_P:
 
@@ -508,11 +518,8 @@ func handle_guild_input(event):
 
 			if roster.size() > 0:
 
-				var removed = roster.pop_back()
-
-				remove_character_from_party(
-					removed
-				)
+				party_system.delete_character(str(roster.back()["character_id"]), true)
+				clamp_roster_page()
 
 				queue_redraw()
 
@@ -533,34 +540,27 @@ func handle_guild_input(event):
 				queue_redraw()
 
 
-func remove_character_from_party(
-	character_to_remove: Dictionary
-):
+func is_at_guild() -> bool:
+	return game_state == GameState.GUILD or game_state == GameState.PARTY_SELECT
 
-	for i in range(
-		party.size() - 1,
-		-1,
-		-1
-	):
 
-		if party[i] == character_to_remove:
+func load_test_roster():
+	if not is_at_guild():
+		return
+	party_system = PartyScript.new()
+	for member in TestParty.create():
+		party_system.register_character(member)
+		party_system.assign_member(str(member["character_id"]), party_system.roster.size() - 1, true)
+	roster_page = 0
 
-			party.remove_at(i)
-
-# ============================================================
-# DEVELOPMENT TEST PARTY
-# ============================================================
 
 func start_test_party():
-
-	party = TestParty.create()
-	roster = party.duplicate()
-
+	load_test_roster()
 	city.reset()
-
 	game_state = GameState.CITY
-
 	queue_redraw()
+
+
 # ============================================================
 # RACE SELECTION
 # ============================================================
@@ -928,16 +928,14 @@ func handle_review_input(event):
 
 func add_character_to_roster():
 
-	if roster.size() >= MAX_ROSTER_SIZE:
+	if not is_at_guild() and game_state != GameState.CREATE_REVIEW:
 		return
 
 	var finished_character = (
 		character.duplicate(true)
 	)
 
-	roster.append(
-		finished_character
-	)
+	party_system.register_character(finished_character)
 
 	reset_character_creator()
 
@@ -950,45 +948,42 @@ func add_character_to_roster():
 # PARTY SELECTION
 # ============================================================
 
-func handle_party_select_input(event):
+func clamp_roster_page():
+	roster_page = clampi(roster_page, 0, maxi(0, int((roster.size() - 1) / ROSTER_PAGE_SIZE)))
 
+
+func handle_roster_paging(event) -> bool:
+	if event.keycode == KEY_PAGEUP or event.keycode == KEY_PAGEDOWN:
+		roster_page += -1 if event.keycode == KEY_PAGEUP else 1
+		clamp_roster_page()
+		queue_redraw()
+		return true
+	return false
+
+
+func handle_party_select_input(event):
 	if not event.is_pressed() or event.is_echo():
 		return
-
-	if event.keycode == KEY_ESCAPE:
-
-		game_state = GameState.GUILD
-
-		queue_redraw()
-
+	if handle_roster_paging(event):
 		return
-
-	if event.keycode == KEY_ENTER:
-
-		if party.size() > 0:
-
-			city.reset()
-
-			game_state = GameState.CITY
-
-			queue_redraw()
-
-		return
-
-	var choice = number_key_to_roster_index(
-		event.keycode
-	)
-
-	if choice == -1:
-		return
-
-	if choice >= roster.size():
-		return
-
-	toggle_party_member(
-		choice
-	)
-
+	match event.keycode:
+		KEY_ESCAPE:
+			game_state = GameState.GUILD
+		KEY_ENTER:
+			if party_system.can_adventure():
+				game_state = GameState.CITY
+			else:
+				party_message = "Choose at least one adventurer before leaving."
+		KEY_LEFT:
+			selected_formation_slot = (selected_formation_slot + 5) % 6
+		KEY_RIGHT:
+			selected_formation_slot = (selected_formation_slot + 1) % 6
+		KEY_BACKSPACE:
+			party_system.remove_member(party_system.slots[selected_formation_slot], is_at_guild())
+		_:
+			var choice = number_key_to_roster_index(event.keycode)
+			if choice >= 0:
+				toggle_party_member(roster_page * ROSTER_PAGE_SIZE + choice)
 	queue_redraw()
 
 
@@ -1028,45 +1023,19 @@ func number_key_to_roster_index(
 	return -1
 
 
-func toggle_party_member(
-	roster_index: int
-):
-
-	var selected = roster[
-		roster_index
-	]
-
-	var party_index = get_party_index(
-		selected
-	)
-
-	if party_index != -1:
-
-		party.remove_at(
-			party_index
-		)
-
+func toggle_party_member(roster_index: int):
+	if not is_at_guild() or roster_index < 0 or roster_index >= roster.size():
 		return
-
-	if party.size() >= MAX_PARTY_SIZE:
-		return
-
-	party.append(
-		selected
-	)
+	var id: String = roster[roster_index]["character_id"]
+	party_system.assign_member(id, selected_formation_slot, is_at_guild())
+	party_message = "Assigned " + str(roster[roster_index]["name"]) + " to " + PartyScript.SLOT_NAMES[selected_formation_slot] + "."
 
 
-func get_party_index(
-	target: Dictionary
-) -> int:
-
-	for i in range(
-		party.size()
-	):
-
-		if party[i] == target:
+func get_party_index(target: Dictionary) -> int:
+	var id = str(target.get("character_id", ""))
+	for i in range(party.size()):
+		if str(party[i].get("character_id", "")) == id:
 			return i
-
 	return -1
 
 
@@ -2751,194 +2720,39 @@ func draw_header(
 # DRAW GUILD
 # ============================================================
 
+func draw_roster_page():
+	clamp_roster_page()
+	var start = roster_page * ROSTER_PAGE_SIZE
+	for i in range(start, mini(start + ROSTER_PAGE_SIZE, roster.size())):
+		var member: Dictionary = roster[i]
+		var slot = party_system.slots.find(member["character_id"])
+		var position = "Reserve" if slot < 0 else PartyScript.SLOT_NAMES[slot]
+		var text = "%d) %s  %s  LV %d  [%s]" % [i - start + 1, member["name"], member["class"], member["level"], position]
+		draw_string(ThemeDB.fallback_font, Vector2(80, 145 + (i - start) * 25), text)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 385), "[PgUp/PgDn] Roster page %d / %d" % [roster_page + 1, maxi(1, int(ceil(roster.size() / 9.0)))])
+
+
 func draw_guild():
+	draw_header("THE ADVENTURERS' GUILD")
+	draw_roster_page()
+	draw_string(ThemeDB.fallback_font, Vector2(80, 430), "[C] CREATE CHARACTER    [P] ASSEMBLE PARTY")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 465), "[D] DELETE LAST CHARACTER    [T] QUICK TEST PARTY")
+	if party_system.can_adventure():
+		draw_string(ThemeDB.fallback_font, Vector2(80, 500), "[L] LEAVE GUILD")
 
-	draw_header(
-		"THE ADVENTURERS' GUILD"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			120
-		),
-		"ROSTER"
-	)
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			400,
-			525
-		),
-		"[T] QUICK TEST PARTY"
-	)
-	
-	if roster.size() == 0:
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				100,
-				165
-			),
-			"No adventurers have joined the Guild."
-		)
-
-	else:
-
-		for i in range(
-			roster.size()
-		):
-
-			var member = roster[i]
-
-			var text = (
-				str(i + 1)
-				+ ". "
-				+ member["name"]
-				+ "   "
-				+ member["race"]
-				+ "   "
-				+ member["class"]
-				+ "   LV "
-				+ str(member["level"])
-			)
-
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(
-					100,
-					160 + i * 24
-				),
-				text
-			)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			525
-		),
-		"[C] CREATE NEW CHARACTER"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			555
-		),
-		"[P] ASSEMBLE PARTY"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			585
-		),
-		"[D] DELETE LAST CHARACTER"
-	)
-
-	if party.size() > 0:
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				400,
-				555
-			),
-			"[L] LEAVE GUILD"
-		)
-
-
-# ============================================================
-# DRAW PARTY SELECTION
-# ============================================================
 
 func draw_party_selection():
-
-	draw_header(
-		"ASSEMBLE YOUR PARTY"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			120
-		),
-		"Select up to six adventurers."
-	)
-
-	for i in range(
-		min(
-			roster.size(),
-			9
-		)
-	):
-
-		var member = roster[i]
-
-		var marker = "[ ]"
-
-		if get_party_index(
-			member
-		) != -1:
-
-			marker = "[X]"
-
-		var text = (
-			str(i + 1)
-			+ ") "
-			+ marker
-			+ " "
-			+ member["name"]
-			+ "   "
-			+ member["race"]
-			+ " "
-			+ member["class"]
-		)
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				100,
-				160 + i * 32
-			),
-			text
-		)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			500
-		),
-		"PARTY SIZE: "
-		+ str(party.size())
-		+ "/"
-		+ str(MAX_PARTY_SIZE)
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			540
-		),
-		"[1-9] ADD / REMOVE CHARACTER"
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(
-			80,
-			570
-		),
-		"[ENTER] BEGIN ADVENTURE     [ESC] GUILD"
-	)
+	draw_header("ASSEMBLE YOUR PARTY")
+	draw_roster_page()
+	for i in range(6):
+		var member = party_system.find_character(party_system.slots[i])
+		var label = PartyScript.SLOT_NAMES[i] + ": " + str(member.get("name", "Empty"))
+		if i == selected_formation_slot:
+			label = "> " + label
+		draw_string(ThemeDB.fallback_font, Vector2(80 + (i % 3) * 230, 425 + int(i / 3) * 30), label)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 495), "[Left/Right] SLOT   [1-9] ASSIGN / SWAP   [Backspace] REMOVE")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 530), "PARTY %d/6   [Enter] ADVENTURE   [Esc] GUILD" % party.size())
+	draw_string(ThemeDB.fallback_font, Vector2(80, 565), party_message)
 
 
 # ============================================================
@@ -4567,8 +4381,8 @@ func draw_party_panel():
 			status = "  [DOWN]"
 
 		var text = (
-			str(i + 1)
-			+ ". "
+			PartyScript.SLOT_NAMES[party_system.slots.find(member["character_id"])]
+			+ ": "
 			+ member["name"]
 			+ "  "
 			+ member["class"]
