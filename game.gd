@@ -79,6 +79,10 @@ var party: Array:
 var roster_page: int = 0
 var selected_formation_slot: int = 0
 var party_message: String = ""
+var class_skills_open: bool = false
+var class_character_index: int = 0
+var class_skill_index: int = 0
+var class_skill_message: String = ""
 var rogue_skills_open: bool = false
 var rogue_character_index: int = 0
 var rogue_selected_skill: String = "pick_lock"
@@ -266,6 +270,13 @@ func _input(event):
 		else:
 			load_game()
 		queue_redraw()
+		return
+
+	if class_skills_open:
+		handle_class_skills_input(event)
+		return
+	if not rogue_skills_open and not formation_menu_open and not developer_menu_open and event.is_pressed() and not event.is_echo() and event.keycode == KEY_K:
+		open_class_skills()
 		return
 
 	if rogue_skills_open:
@@ -1974,6 +1985,9 @@ func activate_dungeon_transition():
 		open_rogue_skills()
 		return
 
+	if not dungeon.get_exploration_object().is_empty():
+		open_class_skills()
+		return
 	var transition = dungeon.get_current_transition()
 
 	if transition.is_empty():
@@ -2555,6 +2569,9 @@ func clear_all_combat_flags():
 
 func _draw():
 	draw_rect(get_viewport_rect(), Color("#111118"))
+	if class_skills_open:
+		draw_class_skills()
+		return
 	if rogue_skills_open:
 		draw_rogue_skills()
 		return
@@ -2734,7 +2751,7 @@ func draw_roster_page():
 func draw_guild():
 	draw_header("THE ADVENTURERS' GUILD")
 	draw_roster_page()
-	draw_string(ThemeDB.fallback_font, Vector2(80, 430), "[C] CREATE CHARACTER    [P] ASSEMBLE PARTY    [I] MANAGE")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 430), "[C] CREATE CHARACTER  [P] ASSEMBLE PARTY  [I] MANAGE  [K] SKILLS")
 	draw_string(ThemeDB.fallback_font, Vector2(80, 465), "[D] DELETE LAST CHARACTER    [T] QUICK TEST PARTY")
 	if party_system.can_adventure():
 		draw_string(ThemeDB.fallback_font, Vector2(80, 500), "[L] LEAVE GUILD")
@@ -3609,7 +3626,7 @@ func draw_inventory_screen():
 	else:
 		draw_character_details(member)
 	draw_string(ThemeDB.fallback_font, Vector2(60, 530), inventory_message, HORIZONTAL_ALIGNMENT_LEFT, 680)
-	draw_string(ThemeDB.fallback_font, Vector2(60, 565), "[Left/Right] Character   [F] Formation   [Esc] Return")
+	draw_string(ThemeDB.fallback_font, Vector2(60, 565), "[Left/Right] Character   [K] Skills   [F] Formation   [Esc] Return")
 
 func draw_character_details(member: Dictionary):
 	draw_string(ThemeDB.fallback_font, Vector2(80, 220), "STR %d   INT %d   DEX %d   CON %d   LCK %d" % [member.get("str", 0), member.get("int", 0), member.get("dex", 0), member.get("con", 0), member.get("lck", 0)])
@@ -3629,8 +3646,7 @@ func draw_character_details(member: Dictionary):
 		draw_string(ThemeDB.fallback_font, Vector2(80, 345 + i * 22), "%s   SP %d   Cooldown %d" % [skill["name"], skill["cost"], skill["cooldown"]])
 
 
-	if str(member.get("class", "")) == "Rogue":
-		draw_string(ThemeDB.fallback_font, Vector2(80, 495), "Exploration: Pick Lock, Disarm Trap")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 495), "[K] " + ExplorationSkills.menu_name(str(member.get("class", ""))))
 
 # ============================================================
 # DRAW TRAINING HALL
@@ -4248,7 +4264,7 @@ func draw_party_panel():
 			60,
 			495
 		),
-		("PARTY     GOLD: " if game_state in [GameState.COMBAT, GameState.COMBAT_RESULT] else "PARTY [I: MANAGE] [F: FORMATION]     GOLD: ")
+		("PARTY     GOLD: " if game_state in [GameState.COMBAT, GameState.COMBAT_RESULT] else "PARTY [I: MANAGE] [K: SKILLS] [F: FORMATION]     GOLD: ")
 		+ str(
 			progression.get_party_gold()
 		)
@@ -4339,12 +4355,12 @@ func draw_status():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(780, 130),
-		"[I] Inventory  [R] Skills" + ("  [G] Exit" if dungeon.dungeon_id == "abandoned_warehouse" else "")
+		"[I] Items [K] Skills [R] Rogue" + ("  [G] Exit" if dungeon.dungeon_id == "abandoned_warehouse" else "")
 	)
 
 	var display_message = dungeon.message
-	if display_message.is_empty() and not dungeon.get_rogue_object().is_empty():
-		display_message = str(dungeon.get_rogue_object()["name"]) + ". [Enter] Rogue Skills."
+	if display_message.is_empty() and not dungeon.get_exploration_object().is_empty():
+		display_message = str(dungeon.get_exploration_object()["name"]) + ". [Enter] Skills."
 	if display_message != "":
 		var message_lines = wrap_ui_text(display_message, 44)
 		for i in range(min(3, message_lines.size())):
@@ -4817,6 +4833,8 @@ func restore_save(data: Dictionary) -> bool:
 	combat_target_open = false
 	formation_menu_open = false
 	rogue_skills_open = false
+	class_skills_open = false
+	class_skill_message = ""
 	rogue_message = ""
 	developer_menu_open = false
 	inventory_character_index = 0
@@ -4918,3 +4936,85 @@ func draw_rogue_skills():
 	for i in range(wrap_ui_text(rogue_message, 90).size()):
 		draw_string(ThemeDB.fallback_font, Vector2(60, 425 + i * 24), wrap_ui_text(rogue_message, 90)[i])
 	draw_string(ThemeDB.fallback_font, Vector2(60, 540), "[Left/Right] Rogue   [1/2] Skill   [Enter] Attempt   [Esc] Back")
+
+
+func open_class_skills():
+	if game_state not in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.INVENTORY, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN, GameState.TEMPLE]:
+		return
+	class_character_index = 0
+	if game_state == GameState.INVENTORY:
+		var members = get_management_members()
+		if not members.is_empty():
+			class_character_index = maxi(0, get_party_index(members[clampi(inventory_character_index, 0, members.size() - 1)]))
+	class_skill_index = 0
+	class_skill_message = ""
+	class_skills_open = true
+	queue_redraw()
+
+func handle_class_skills_input(event):
+	if not event.is_pressed() or event.is_echo():
+		return
+	if event.keycode == KEY_ESCAPE:
+		class_skills_open = false
+		queue_redraw()
+		return
+	if party.is_empty():
+		return
+	class_character_index = clampi(class_character_index, 0, party.size() - 1)
+	if event.keycode in [KEY_LEFT, KEY_RIGHT]:
+		class_character_index = (class_character_index + party.size() + (-1 if event.keycode == KEY_LEFT else 1)) % party.size()
+		class_skill_index = 0
+		class_skill_message = ""
+	else:
+		var actor = party[class_character_index]
+		var skills = ExplorationSkills.skills_for_class(str(actor.get("class", "")))
+		var choice = number_key_to_roster_index(event.keycode)
+		if choice >= 0 and choice < skills.size():
+			class_skill_index = choice
+			class_skill_message = ""
+		elif event.keycode == KEY_ENTER and not skills.is_empty():
+			if stable_save_state() != GameState.DUNGEON:
+				class_skill_message = "No matching exploration target here."
+			else:
+				class_skill_index = clampi(class_skill_index, 0, skills.size() - 1)
+				var result = ExplorationSkills.attempt(party_system, dungeon, actor, skills[class_skill_index])
+				progression.add_gold(int(result.get("gold", 0)))
+				class_skill_message = str(result["message"])
+				if int(result.get("gold", 0)) > 0:
+					class_skill_message += " +%d gold." % int(result["gold"])
+				dungeon.message = class_skill_message
+				if combat.party_defeated(party):
+					class_skills_open = false
+					combat_result_text = "THE PARTY HAS FALLEN.\n\nGame over. Reload the last save to continue."
+					game_state = GameState.COMBAT_RESULT
+	queue_redraw()
+
+func draw_class_skills():
+	if party.is_empty():
+		draw_header("CLASS SKILLS")
+		draw_string(ThemeDB.fallback_font, Vector2(60, 150), "Assemble an active party to view class skills. [Esc] Back")
+		return
+	class_character_index = clampi(class_character_index, 0, party.size() - 1)
+	var actor = party[class_character_index]
+	var menu = ExplorationSkills.menu_name(str(actor.get("class", "")))
+	draw_header(menu.to_upper())
+	draw_string(ThemeDB.fallback_font, Vector2(60, 120), str(actor["name"]) + " — " + str(actor.get("class", "")) + " — " + CharacterHealth.status(actor))
+	var skills = ExplorationSkills.skills_for_class(str(actor.get("class", "")))
+	if skills.is_empty():
+		var message = "No out-of-combat spells defined yet." if menu == "Cast Spell" else "No Bard songs defined yet."
+		draw_string(ThemeDB.fallback_font, Vector2(60, 220), message)
+		draw_string(ThemeDB.fallback_font, Vector2(60, 540), "[Left/Right] Character   [Esc] Back")
+		return
+	class_skill_index = clampi(class_skill_index, 0, skills.size() - 1)
+	var object = dungeon.get_exploration_object() if stable_save_state() == GameState.DUNGEON else {}
+	draw_string(ThemeDB.fallback_font, Vector2(60, 165), "Target: " + str(object.get("name", "No exploration target here")))
+	for i in range(skills.size()):
+		draw_string(ThemeDB.fallback_font, Vector2(80, 225 + i * 40), ("> " if i == class_skill_index else "  ") + str(i + 1) + ") " + str(ExplorationSkills.SKILLS[skills[i]]["name"]))
+	var reason = "No matching exploration target here." if stable_save_state() != GameState.DUNGEON else ExplorationSkills.unavailable_reason(party_system, dungeon, actor, skills[class_skill_index])
+	draw_string(ThemeDB.fallback_font, Vector2(60, 325), reason if not reason.is_empty() else "Success chance: 70%. One attempt per character per object.")
+	var damage = int(object.get("failure_damage", 4 if skills[class_skill_index] == "disarm_trap" else 0))
+	draw_string(ThemeDB.fallback_font, Vector2(60, 365), "Failure: %d damage; this character cannot retry." % damage if damage > 0 else "Failure: no progress; this character cannot retry.")
+	var lines = wrap_ui_text(class_skill_message, 90)
+	for i in range(mini(lines.size(), 4)):
+		draw_string(ThemeDB.fallback_font, Vector2(60, 415 + i * 24), lines[i])
+	draw_string(ThemeDB.fallback_font, Vector2(60, 555), "[Left/Right] Character   [1/2] Skill   [Enter] Attempt   [Esc] Back")

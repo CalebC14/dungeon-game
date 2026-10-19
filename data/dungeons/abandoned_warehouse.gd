@@ -14,5 +14,12 @@ const DATA = {
 	"rogue_objects": {
 		Vector2i(1,13): {"id":"warehouse_test_lock", "name":"Padlocked supply chest", "skill":"pick_lock", "reward_gold":20},
 		Vector2i(3,13): {"id":"warehouse_test_trap", "name":"Trapped coin box", "skill":"disarm_trap", "reward_gold":10, "failure_damage":4}
+	},
+	"exploration_objects": {
+		Vector2i(5,13): {"id": "warehouse_force_obstacle", "name": "Heavy storage gate", "skill": "force_obstacle", "reward_gold": 10, "failure_damage": 2, "success_message": "The gate lifts, exposing a small cache."},
+		Vector2i(7,13): {"id": "warehouse_break_barricade", "name": "Brittle timber barricade", "skill": "break_barricade", "reward_gold": 10, "failure_damage": 2, "success_message": "The barricade breaks, exposing a small cache."},
+		Vector2i(9,13): {"id": "warehouse_scout", "name": "Warehouse lookout", "skill": "scout", "reward_gold": 0, "failure_damage": 0, "success_message": "Scouting spots a large rat nest in the northeast corner (13,1)."},
+		Vector2i(11,13): {"id": "warehouse_track", "name": "Tracks beneath the crates", "skill": "track", "reward_gold": 10, "failure_damage": 0, "success_message": "You follow the tracks to a hidden coin pouch."},
+		Vector2i(13,13): {"id": "warehouse_traverse_gap", "name": "Gap beside the loading ledge", "skill": "traverse_gap", "reward_gold": 10, "failure_damage": 2, "success_message": "You cross the gap and retrieve an abandoned coin pouch."}
 	}
 }

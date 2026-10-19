@@ -163,3 +163,6 @@ func consume_current_event(per_expedition: bool = false) -> void:
 # Optional objects use current-tile interaction and never block movement.
 func get_rogue_object() -> Dictionary:
 	return dungeon_data.get("rogue_objects", {}).get(player_pos, {})
+
+func get_exploration_object() -> Dictionary:
+	return dungeon_data.get("exploration_objects", {}).get(player_pos, get_rogue_object())
