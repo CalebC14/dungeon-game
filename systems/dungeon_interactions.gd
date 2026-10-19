@@ -6,10 +6,17 @@ static func state_key(dungeon, object: Dictionary) -> String:
 	return dungeon.dungeon_id + ":" + str(object.get("id", ""))
 
 static func is_barrier(object: Dictionary) -> bool:
-	return object.get("type", "") in ["locked_door", "shortcut"]
+	return object.get("type", "") in ["locked_door", "shortcut", "secret_door"]
 
 static func is_open(dungeon, object: Dictionary) -> bool:
 	return bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("open", false))
+
+static func is_hidden(dungeon, object: Dictionary) -> bool:
+	return object.get("type", "") == "secret_door" and not is_open(dungeon, object)
+
+static func facing_secret(dungeon) -> Dictionary:
+	var object: Dictionary = dungeon.get_interaction_at(dungeon.player_pos + dungeon.get_forward_direction())
+	return object if is_hidden(dungeon, object) else {}
 
 static func trap_active(dungeon, object: Dictionary) -> bool:
 	var state: Dictionary = dungeon.interaction_states.get(state_key(dungeon, object), {})
@@ -23,7 +30,7 @@ static func trigger_trap(dungeon, object: Dictionary, actor: Dictionary) -> Dict
 	return {"triggered": true, "message": str(object.get("name", "Trap")) + " triggers! " + str(actor.get("name", "Adventurer")) + " loses %d HP." % damage}
 
 static func available(dungeon, object: Dictionary) -> bool:
-	if object.is_empty():
+	if object.is_empty() or is_hidden(dungeon, object):
 		return false
 	return object.get("type", "") != "key" or not bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("collected", false))
 
@@ -36,6 +43,9 @@ static func target(dungeon) -> Dictionary:
 	return {}
 
 static func describe(dungeon, keys: Dictionary) -> String:
+	var secret = facing_secret(dungeon)
+	if not secret.is_empty():
+		return str(secret.get("clue", "A faint draft slips through the wall.")) + " [Enter] Search wall."
 	var object = target(dungeon)
 	if object.is_empty():
 		return ""
@@ -54,6 +64,8 @@ static func describe(dungeon, keys: Dictionary) -> String:
 			if bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("used", false)):
 				return name_text + " is down. The shortcut is open."
 			return name_text + ". [Enter] Pull lever."
+		"secret_door":
+			return name_text + " is open."
 		"shortcut":
 			return name_text + (" is open." if is_open(dungeon, object) else " is closed. Find its lever.")
 	return name_text
@@ -61,6 +73,10 @@ static func describe(dungeon, keys: Dictionary) -> String:
 static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dictionary:
 	if in_combat:
 		return {"handled": false, "message": "Interactions are unavailable during combat."}
+	var secret = facing_secret(dungeon)
+	if not secret.is_empty():
+		dungeon.interaction_states[state_key(dungeon, secret)] = {"open": true}
+		return {"handled": true, "message": str(secret.get("discovery_message", "You discover a secret door. The passage opens!"))}
 	var object = target(dungeon)
 	if object.is_empty():
 		return {"handled": false, "message": ""}
@@ -95,6 +111,8 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 				dungeon.interaction_states[state_key(dungeon, destination)] = {"open": true}
 			dungeon.interaction_states[key] = {"used": true}
 			return {"handled": true, "message": str(object.get("message", "The lever opens a shortcut."))}
+		"secret_door":
+			return {"handled": true, "message": name_text + " is already open."}
 		"shortcut":
 			return {"handled": true, "message": name_text + (" is open." if is_open(dungeon, object) else " is closed. Find its lever.")}
 	return {"handled": false, "message": ""}

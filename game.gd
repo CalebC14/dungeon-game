@@ -4453,7 +4453,7 @@ func draw_map():
 					color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
 				elif DungeonInteractions.is_barrier(object):
 					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
-					label = "D" if object["type"] == "locked_door" else "S"
+					label = "D" if object["type"] in ["locked_door", "secret_door"] else "S"
 				draw_rect(rect, color)
 				draw_string(ThemeDB.fallback_font, rect.position + Vector2(3, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 
@@ -5066,7 +5066,7 @@ func draw_class_skills():
 func draw_dungeon_interaction():
 	var position = dungeon.player_pos + dungeon.get_forward_direction()
 	var barrier = dungeon.get_interaction_at(position)
-	if DungeonInteractions.is_barrier(barrier) and not DungeonInteractions.is_open(dungeon, barrier):
+	if DungeonInteractions.available(dungeon, barrier) and DungeonInteractions.is_barrier(barrier) and not DungeonInteractions.is_open(dungeon, barrier):
 		var door = Rect2(210, 90, 360, 330)
 		draw_rect(door, Color("#64452f"))
 		draw_rect(door, Color("#cba776"), false, 4)

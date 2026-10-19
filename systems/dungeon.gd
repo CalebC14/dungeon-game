@@ -59,7 +59,9 @@ func move_backward() -> bool:
 func move_to(target: Vector2i) -> bool:
 	if not can_move_to(target):
 		var object = get_interaction_at(target)
-		if DungeonInteractions.is_barrier(object):
+		if DungeonInteractions.is_hidden(self, object):
+			message = "A wall blocks the way."
+		elif DungeonInteractions.is_barrier(object):
 			message = str(object.get("name", "Passage")) + " is closed. Face it and press Enter."
 		return false
 	player_pos = target

@@ -55,6 +55,7 @@ func run_checks():
 	check(game.rogue_skills_open, "existing Rogue object interaction still works")
 	key(game, KEY_ESCAPE)
 	game.dungeon.player_pos = Vector2i(5,13)
+	game.dungeon.facing = 1 # Face away from the new secret wall to interact underfoot.
 	key(game, KEY_ENTER)
 	check(game.class_skills_open, "existing class skill interaction still works")
 	key(game, KEY_ESCAPE)
