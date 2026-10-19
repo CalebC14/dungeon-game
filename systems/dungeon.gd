@@ -196,4 +196,10 @@ func get_skill_target() -> Dictionary:
 		target["failure_damage"] = 0
 		target["success_message"] = "The door opens."
 		return target
+	if interaction.get("type", "") == "trap":
+		var target = interaction.duplicate(true)
+		target["skill"] = "disarm_trap"
+		target["reward_gold"] = 0
+		target["success_message"] = "The floor trap is safe."
+		return target
 	return get_exploration_object()

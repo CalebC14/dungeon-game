@@ -11,6 +11,17 @@ static func is_barrier(object: Dictionary) -> bool:
 static func is_open(dungeon, object: Dictionary) -> bool:
 	return bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("open", false))
 
+static func trap_active(dungeon, object: Dictionary) -> bool:
+	var state: Dictionary = dungeon.interaction_states.get(state_key(dungeon, object), {})
+	return object.get("type", "") == "trap" and not bool(state.get("triggered", false)) and not bool(state.get("disarmed", false))
+
+static func trigger_trap(dungeon, object: Dictionary, actor: Dictionary) -> Dictionary:
+	if not trap_active(dungeon, object) or not CharacterHealth.conscious(actor):
+		return {"triggered": false}
+	dungeon.interaction_states[state_key(dungeon, object)] = {"triggered": true}
+	var damage = CharacterHealth.damage(actor, int(object.get("damage", 4)))
+	return {"triggered": true, "message": str(object.get("name", "Trap")) + " triggers! " + str(actor.get("name", "Adventurer")) + " loses %d HP." % damage}
+
 static func available(dungeon, object: Dictionary) -> bool:
 	if object.is_empty():
 		return false
@@ -30,6 +41,8 @@ static func describe(dungeon, keys: Dictionary) -> String:
 		return ""
 	var name_text = str(object.get("name", "Object"))
 	match object.get("type", ""):
+		"trap":
+			return name_text + (". [R] Disarm Trap, or walk around it." if trap_active(dungeon, object) else " is safe (disarmed or spent).")
 		"key":
 			return name_text + ". [Enter] Take key."
 		"locked_door":
@@ -54,6 +67,8 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 	var key = state_key(dungeon, object)
 	var name_text = str(object.get("name", "Object"))
 	match object.get("type", ""):
+		"trap":
+			return {"handled": true, "message": describe(dungeon, keys)}
 		"key":
 			keys[str(object["key_id"])] = true
 			dungeon.interaction_states[key] = {"collected": true}
@@ -92,6 +107,6 @@ static func valid_states(states: Variant) -> bool:
 		if not key is String or key.is_empty() or not state is Dictionary or state.is_empty():
 			return false
 		for flag in state:
-			if flag not in ["open", "collected", "used"] or not state[flag] is bool:
+			if flag not in ["open", "collected", "used", "triggered", "disarmed"] or not state[flag] is bool:
 				return false
 	return true

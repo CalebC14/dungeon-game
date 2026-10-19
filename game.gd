@@ -1961,6 +1961,17 @@ func handle_dungeon_input(event):
 # ============================================================
 
 func check_dungeon_tile():
+	# Resolve the entered tile before encounters; one-shot traps keep feedback visible.
+	var trap = dungeon.get_interaction_at(dungeon.player_pos)
+	if DungeonInteractions.trap_active(dungeon, trap):
+		for member in party:
+			if CharacterHealth.conscious(member):
+				var result = DungeonInteractions.trigger_trap(dungeon, trap, member)
+				dungeon.message = str(result["message"])
+				if combat.party_defeated(party):
+					combat_result_text = "THE PARTY HAS FALLEN.\n\nGame over. Reload the last save to continue."
+					game_state = GameState.COMBAT_RESULT
+				return
 
 	var fixed_encounter = dungeon.get_current_fixed_encounter()
 
@@ -4437,6 +4448,9 @@ func draw_map():
 				if object["type"] == "key":
 					color = Color("#d9b44a")
 					label = "K"
+				elif object["type"] == "trap":
+					label = "T"
+					color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
 				elif DungeonInteractions.is_barrier(object):
 					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
 					label = "D" if object["type"] == "locked_door" else "S"
@@ -5060,7 +5074,12 @@ func draw_dungeon_interaction():
 		draw_circle(Vector2(440, 275), 9, Color("#d9b44a"))
 		return
 	var object = DungeonInteractions.target(dungeon)
-	if object.get("type", "") == "lever":
+	if object.get("type", "") == "trap":
+		var color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
+		draw_rect(Rect2(310, 350, 160, 35), color, false, 3)
+		for x in range(325, 470, 30):
+			draw_line(Vector2(x, 380), Vector2(x + 8, 355), color, 3)
+	elif object.get("type", "") == "lever":
 		draw_rect(Rect2(345, 180, 90, 140), Color("#37424b"))
 		draw_line(Vector2(390, 285), Vector2(420, 215), Color("#d9b44a"), 8)
 	elif object.get("type", "") == "key":

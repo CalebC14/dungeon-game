@@ -23,6 +23,7 @@ const DATA = {
 		Vector2i(13,13): {"id": "warehouse_traverse_gap", "name": "Gap beside the loading ledge", "skill": "traverse_gap", "reward_gold": 10, "failure_damage": 2, "success_message": "You cross the gap and retrieve an abandoned coin pouch."}
 	},
 	"interactions": {
+		Vector2i(4,11): {"id":"warehouse_floor_spikes", "type":"trap", "name":"Floor spike trap", "damage":4},
 		Vector2i(2,11): {"id":"warehouse_brass_key", "type":"key", "name":"Warehouse brass key", "key_id":"warehouse_brass_key"},
 		Vector2i(7,10): {"id":"warehouse_store_door", "type":"locked_door", "name":"Warehouse store door", "pickable":true, "key_id":"warehouse_brass_key", "key_name":"Warehouse brass key"},
 		Vector2i(7,9): {"id":"warehouse_shortcut_lever", "type":"lever", "name":"Cross-passage lever", "opens":["warehouse_cross_passage"], "message":"The lever lowers. A panel slides open in the west wall, connecting the two storage corridors."},

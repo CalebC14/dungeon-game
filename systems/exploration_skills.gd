@@ -50,6 +50,8 @@ static func unavailable_reason(party: PartySystem, dungeon: DungeonSystem, actor
 		return "No matching exploration target on this tile."
 	if object.get("type", "") == "locked_door" and DungeonInteractions.is_open(dungeon, object):
 		return "This door is already open."
+	if object.get("type", "") == "trap" and not DungeonInteractions.trap_active(dungeon, object):
+		return "This trap is already safe."
 	var state: Dictionary = dungeon.rogue_attempts.get(object_key(dungeon, object), {})
 	if bool(state.get("resolved", false)):
 		return "This object has already been resolved."
@@ -71,9 +73,14 @@ static func attempt(party: PartySystem, dungeon: DungeonSystem, actor: Dictionar
 	state["resolved"] = success
 	dungeon.rogue_attempts[key] = state
 	if success:
+		if object.get("type", "") == "trap":
+			dungeon.interaction_states[DungeonInteractions.state_key(dungeon, object)] = {"disarmed": true}
 		if object.get("type", "") == "locked_door":
 			dungeon.interaction_states[DungeonInteractions.state_key(dungeon, object)] = {"open": true}
 		return {"attempted": true, "success": true, "gold": int(object.get("reward_gold", 0)), "message": str(actor["name"]) + " succeeds at " + str(SKILLS[skill]["name"]) + ". " + str(object.get("success_message", "Object resolved."))}
+	if object.get("type", "") == "trap":
+		var triggered = DungeonInteractions.trigger_trap(dungeon, object, actor)
+		return {"attempted": true, "success": false, "gold": 0, "message": str(triggered.get("message", "The trap is spent."))}
 	var damage = 0
 	var failure_damage = int(object.get("failure_damage", 4 if skill == "disarm_trap" else 0))
 	if failure_damage > 0:
