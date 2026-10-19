@@ -23,6 +23,7 @@ const DATA = {
 		Vector2i(13,13): {"id": "warehouse_traverse_gap", "name": "Gap beside the loading ledge", "skill": "traverse_gap", "reward_gold": 10, "failure_damage": 2, "success_message": "You cross the gap and retrieve an abandoned coin pouch."}
 	},
 	"interactions": {
+		Vector2i(6,11): {"id":"warehouse_hidden_coins", "type":"hidden_treasure", "name":"a hidden coin pouch", "clue":"A loose floorboard sits beneath the dusty crates.", "reward_gold":25},
 		Vector2i(5,12): {"id":"warehouse_hidden_panel", "type":"secret_door", "name":"Hidden storage passage", "clue":"Scrape marks run beneath this section of wall.", "discovery_message":"You find a concealed catch. A secret door slides open into the storage corridor!"},
 		Vector2i(4,11): {"id":"warehouse_floor_spikes", "type":"trap", "name":"Floor spike trap", "damage":4},
 		Vector2i(2,11): {"id":"warehouse_brass_key", "type":"key", "name":"Warehouse brass key", "key_id":"warehouse_brass_key"},

@@ -30,7 +30,7 @@ static func trigger_trap(dungeon, object: Dictionary, actor: Dictionary) -> Dict
 	return {"triggered": true, "message": str(object.get("name", "Trap")) + " triggers! " + str(actor.get("name", "Adventurer")) + " loses %d HP." % damage}
 
 static func available(dungeon, object: Dictionary) -> bool:
-	if object.is_empty() or is_hidden(dungeon, object):
+	if object.is_empty() or is_hidden(dungeon, object) or object.get("type", "") == "hidden_treasure":
 		return false
 	return object.get("type", "") != "key" or not bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("collected", false))
 
@@ -42,10 +42,22 @@ static func target(dungeon) -> Dictionary:
 			return object
 	return {}
 
+static func treasure_target(dungeon) -> Dictionary:
+	for position in [dungeon.player_pos + dungeon.get_forward_direction(), dungeon.player_pos]:
+		var object: Dictionary = dungeon.get_interaction_at(position)
+		if object.get("type", "") == "hidden_treasure":
+			return object
+	return {}
+
 static func describe(dungeon, keys: Dictionary) -> String:
 	var secret = facing_secret(dungeon)
 	if not secret.is_empty():
 		return str(secret.get("clue", "A faint draft slips through the wall.")) + " [Enter] Search wall."
+	var treasure = treasure_target(dungeon)
+	if not treasure.is_empty():
+		if bool(dungeon.interaction_states.get(state_key(dungeon, treasure), {}).get("collected", false)):
+			return "This hiding place has already been searched."
+		return str(treasure.get("clue", "Something glints beneath the dust.")) + " [Enter] Search."
 	var object = target(dungeon)
 	if object.is_empty():
 		return ""
@@ -77,6 +89,14 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 	if not secret.is_empty():
 		dungeon.interaction_states[state_key(dungeon, secret)] = {"open": true}
 		return {"handled": true, "message": str(secret.get("discovery_message", "You discover a secret door. The passage opens!"))}
+	var treasure = treasure_target(dungeon)
+	if not treasure.is_empty():
+		var treasure_key = state_key(dungeon, treasure)
+		if bool(dungeon.interaction_states.get(treasure_key, {}).get("collected", false)):
+			return {"handled": true, "message": "This hiding place is empty. You already collected its treasure."}
+		var gold = maxi(0, int(treasure.get("reward_gold", 0)))
+		dungeon.interaction_states[treasure_key] = {"collected": true}
+		return {"handled": true, "gold": gold, "message": "You discover " + str(treasure.get("name", "hidden treasure")) + ". +%d gold." % gold}
 	var object = target(dungeon)
 	if object.is_empty():
 		return {"handled": false, "message": ""}

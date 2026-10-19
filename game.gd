@@ -1996,6 +1996,7 @@ func activate_dungeon_transition():
 		return
 	var interaction = DungeonInteractions.interact(dungeon, quest_items)
 	if bool(interaction.get("handled", false)):
+		progression.add_gold(int(interaction.get("gold", 0)))
 		dungeon.message = str(interaction["message"])
 		queue_redraw()
 		return
