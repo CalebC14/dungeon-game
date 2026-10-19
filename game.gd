@@ -73,6 +73,8 @@ var party: Array:
 var roster_page: int = 0
 var selected_formation_slot: int = 0
 var party_message: String = ""
+var formation_menu_open: bool = false
+var formation_source: int = -1
 const ROSTER_PAGE_SIZE = 9
 
 const MAX_PARTY_SIZE = 6
@@ -230,6 +232,8 @@ var shop_message: String = ""
 
 func _ready():
 
+	combat.formation = party_system
+
 	randomize()
 
 	reset_character_creator()
@@ -259,6 +263,13 @@ func reset_character_creator():
 # ============================================================
 
 func _input(event):
+
+	if formation_menu_open:
+		handle_formation_menu_input(event)
+		return
+	if event.is_pressed() and not event.is_echo() and event.keycode == KEY_F and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.INVENTORY, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN]:
+		open_formation_menu()
+		return
 
 	if event.is_pressed() and not event.is_echo() and event.keycode == KEY_F12:
 		developer_menu_open = not developer_menu_open
@@ -548,6 +559,7 @@ func load_test_roster():
 	if not is_at_guild():
 		return
 	party_system = PartyScript.new()
+	combat.formation = party_system
 	for member in TestParty.create():
 		party_system.register_character(member)
 		party_system.assign_member(str(member["character_id"]), party_system.roster.size() - 1, true)
@@ -2127,10 +2139,8 @@ func get_living_combat_targets() -> Array:
 			if member != actor and int(member.get("hp", 0)) > 0:
 				available.append(member)
 		return available
-	for enemy in combat.enemies:
-		if int(enemy.get("hp", 0)) > 0:
-			available.append(enemy)
-	return available
+	var actor = get_current_combat_character()
+	return combat.reachable_targets(actor, combat.enemies, combat.action_range(actor, combat_pending_action, combat_pending_ability))
 
 func begin_combat_target_selection(action_name: String, ability_id: String = "") -> void:
 	combat_pending_action = action_name
@@ -2138,6 +2148,9 @@ func begin_combat_target_selection(action_name: String, ability_id: String = "")
 	combat_target_page = 0
 	combat_target_open = true
 	combat_skills_open = false
+	if get_living_combat_targets().is_empty():
+		combat_target_open = false
+		combat.add_log("No reachable targets. Reposition or choose another action.")
 	queue_redraw()
 
 
@@ -2175,6 +2188,9 @@ func get_combat_skill_options(actor: Dictionary) -> Array:
 
 
 func combat_skill_unavailable_reason(actor: Dictionary, skill: Dictionary) -> String:
+	var mode = combat.action_range(actor, "Ability", str(skill.get("id", "")))
+	if mode != "magic" and combat.reachable_targets(actor, combat.enemies, mode).is_empty():
+		return "no reachable targets"
 	if str(skill.get("id", "")) in ["berserker_savage_intervention", "berserker_dance_of_carnage"] and not combat.berserker_has_melee_weapon(actor):
 		return "melee weapon required"
 	if bool(skill.get("shield", false)) and not combat.has_equipped_shield(actor):
@@ -2254,6 +2270,8 @@ func handle_combat_input(event):
 			queue_redraw()
 		KEY_4:
 			attempt_party_escape()
+		KEY_5:
+			open_formation_menu()
 
 
 # ============================================================
@@ -2276,7 +2294,8 @@ func get_current_combat_character() -> Dictionary:
 func queue_current_action(
 	action_name: String,
 	ability_id: String = "",
-	target: Dictionary = {}
+	target: Dictionary = {},
+	target_slot: int = -1
 ):
 
 	var actor = (
@@ -2291,7 +2310,7 @@ func queue_current_action(
 
 	combat_skills_open = false
 	combat_target_open = false
-	combat.queue_action(actor, action_name, ability_id, target)
+	combat.queue_action(actor, action_name, ability_id, target, target_slot)
 
 	combat_character_index += 1
 
@@ -2556,6 +2575,10 @@ func clear_all_combat_flags():
 # ============================================================
 
 func _draw():
+
+	if formation_menu_open:
+		draw_formation_menu()
+		return
 
 	draw_rect(
 		Rect2(
@@ -4362,7 +4385,7 @@ func draw_party_panel():
 			60,
 			495
 		),
-		"PARTY     GOLD: "
+		"PARTY [F: FORMATION]     GOLD: "
 		+ str(
 			progression.get_party_gold()
 		)
@@ -4660,6 +4683,7 @@ func draw_combat_action_menu():
 	draw_string(ThemeDB.fallback_font, Vector2(80, 325), "2) DEFEND")
 	draw_string(ThemeDB.fallback_font, Vector2(80, 350), "3) SKILLS")
 	draw_string(ThemeDB.fallback_font, Vector2(80, 375), "4) RUN")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 400), "5) REPOSITION (uses action)")
 
 
 func get_class_ability_name(
@@ -4769,3 +4793,53 @@ func draw_combat_result():
 		),
 		"[ENTER] CONTINUE"
 	)
+
+
+# The overlay preserves the underlying location and never exposes reserves.
+func open_formation_menu():
+	formation_menu_open = true
+	formation_source = -1
+	queue_redraw()
+
+func handle_formation_menu_input(event):
+	if not event.is_pressed() or event.is_echo():
+		return
+	if event.keycode == KEY_ESCAPE:
+		formation_menu_open = false
+		formation_source = -1
+		queue_redraw()
+		return
+	var slot = int(event.keycode) - int(KEY_1)
+	if slot < 0 or slot >= 6:
+		return
+	if game_state == GameState.COMBAT:
+		var actor = get_current_combat_character()
+		if actor.is_empty() or not combat.can_act(actor):
+			return
+		if party_system.slots.find(str(actor.get("character_id", ""))) == slot:
+			return
+		formation_menu_open = false
+		queue_current_action("Reposition", "", {}, slot)
+	elif formation_source < 0:
+		if party_system.slots[slot] != "":
+			formation_source = slot
+	else:
+		party_system.reposition(party_system.slots[formation_source], slot)
+		formation_source = -1
+	queue_redraw()
+
+func draw_formation_menu():
+	draw_header("PARTY FORMATION")
+	var instruction = "Choose a character [1-6], then a destination [1-6]."
+	if game_state == GameState.COMBAT:
+		instruction = "Choose destination [1-6] for " + str(get_current_combat_character().get("name", "")) + ". Uses their action."
+	elif formation_source >= 0:
+		instruction = "Choose destination [1-6] for " + str(party_system.find_character(party_system.slots[formation_source]).get("name", "")) + "."
+	draw_string(ThemeDB.fallback_font, Vector2(60, 130), instruction)
+	for i in range(6):
+		var member = party_system.find_character(party_system.slots[i])
+		var marker = "> " if i == formation_source else ""
+		var text = marker + str(i + 1) + ") " + PartyScript.SLOT_NAMES[i] + ": " + str(member.get("name", "Empty"))
+		draw_string(ThemeDB.fallback_font, Vector2(80, 185 + i * 40), text)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 470), "Occupied positions swap. Reserve characters stay at the Guild.")
+	draw_string(ThemeDB.fallback_font, Vector2(60, 510), "[Esc] Back")

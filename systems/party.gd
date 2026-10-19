@@ -43,6 +43,15 @@ func assign_member(id: String, slot: int, at_guild: bool) -> bool:
 	slots[slot] = id
 	return true
 
+# Rearrangement never adds a reserve or changes active membership.
+func reposition(id: String, slot: int) -> bool:
+	var previous = slots.find(id)
+	if id.is_empty() or previous < 0 or slot < 0 or slot >= 6 or previous == slot:
+		return false
+	slots[previous] = slots[slot]
+	slots[slot] = id
+	return true
+
 func remove_member(id: String, at_guild: bool) -> bool:
 	if not at_guild or not slots.has(id):
 		return false

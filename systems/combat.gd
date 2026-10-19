@@ -13,6 +13,9 @@ var round_number: int = 1
 
 var party_actions: Array = []
 
+# Canonical persistent slots; unbound legacy fixtures default to front row.
+var formation: PartySystem = null
+
 var song_of_courage_active: bool = false
 
 var inventory_system = InventorySystem.new()
@@ -243,6 +246,8 @@ func create_enemy_from_data(
 		"gold_max": enemy_data["gold_max"],
 
 		"tags": enemy_data["tags"].duplicate(),
+		"attack_range": enemy_data.get("attack_range", "melee"),
+		"formation_slot": enemy_data.get("formation_slot", 0),
 		"threat": {},
 		"effects": []
 	}
@@ -363,6 +368,85 @@ func all_enemies_defeated() -> bool:
 # PARTY HELPERS
 # ============================================================
 
+func position_of(actor: Dictionary) -> int:
+	if formation != null:
+		var slot = formation.slots.find(str(actor.get("character_id", "")))
+		if slot >= 0 and actor.get("character_id", "") != "":
+			return slot
+	return int(actor.get("formation_slot", 0))
+
+func can_act(actor: Dictionary) -> bool:
+	if int(actor.get("hp", 0)) <= 0:
+		return false
+	for condition in ["stun", "paralysis", "petrify"]:
+		if effects.has_control(actor, condition):
+			return false
+	return true
+
+func attack_range(actor: Dictionary) -> String:
+	if actor.has("attack_range"):
+		return str(actor["attack_range"])
+	var equipment: Dictionary = actor.get("equipment", {})
+	var weapon: Dictionary = ItemData.ITEMS.get(equipment.get("weapon", ""), {})
+	return str(weapon.get("attack_range", "melee"))
+
+func reachable_targets(actor: Dictionary, defenders: Array, mode: String = "") -> Array:
+	if not can_act(actor):
+		return []
+	var reach = attack_range(actor) if mode.is_empty() else mode
+	# Reach permits attacking from rear but still targets the opposing front.
+	if reach == "melee" and position_of(actor) >= 3:
+		return []
+	var living: Array = []
+	var front: Array = []
+	for target in defenders:
+		if int(target.get("hp", 0)) <= 0:
+			continue
+		living.append(target)
+		if position_of(target) < 3 and can_act(target):
+			front.append(target)
+	if reach == "ranged" or reach == "magic" or front.is_empty():
+		return living
+	# An incapacitated/stunned front cannot protect the rear, but remains
+	# targetable if alive. A standing front anywhere shields every rear slot.
+	var eligible: Array = []
+	for target in living:
+		if position_of(target) < 3:
+			eligible.append(target)
+	return eligible
+
+func action_range(actor: Dictionary, action_name: String, ability_id: String = "") -> String:
+	if action_name == "Attack":
+		return attack_range(actor)
+	if ability_id in ["warrior_shield_bash", "paladin_shield_bash"]:
+		return "melee"
+	if ability_id == "warrior_disarm":
+		return attack_range(actor)
+	if ability_id == "" and str(actor.get("class", "")) in ["Warrior", "Berserker", "Rogue", "Monk"]:
+		return attack_range(actor)
+	return "magic"
+
+func resolve_reachable_target(actor: Dictionary, selected: Dictionary = {}, mode: String = "") -> Dictionary:
+	var available = reachable_targets(actor, enemies, mode)
+	if selected.is_empty():
+		if not available.is_empty():
+			return available[0]
+	else:
+		for target in available:
+			if is_same(target, selected):
+				return target
+	add_log(str(actor.get("name", "Character")) + " has no reachable target for this action.")
+	return {}
+
+func reposition_actor(actor: Dictionary, slot: int) -> bool:
+	if formation == null or not can_act(actor):
+		return false
+	if not formation.reposition(str(actor.get("character_id", "")), slot):
+		add_log("The selected formation move is no longer available.")
+		return false
+	add_log(str(actor.get("name", "Character")) + " moves to " + PartySystem.SLOT_NAMES[slot] + ".")
+	return true
+
 func get_living_party(
 	party: Array
 ) -> Array:
@@ -405,14 +489,16 @@ func queue_action(
 	character: Dictionary,
 	action_name: String,
 	ability_id: String = "",
-	target: Dictionary = {}
+	target: Dictionary = {},
+	target_slot: int = -1
 ) -> void:
 
 	party_actions.append({
 		"actor": character,
 		"action": action_name,
 		"ability_id": ability_id,
-		"target": target
+		"target": target,
+		"target_slot": target_slot
 	})
 
 
@@ -503,7 +589,8 @@ func resolve_party_action(
 
 	var actor = action_data["actor"]
 
-	if actor["hp"] <= 0:
+	if not can_act(actor):
+		add_log(str(actor.get("name", "Character")) + " cannot act.")
 		return
 
 	ensure_warrior_tank_presence(actor)
@@ -515,6 +602,9 @@ func resolve_party_action(
 	)
 
 	match action_name:
+
+		"Reposition":
+			reposition_actor(actor, int(action_data.get("target_slot", -1)))
 
 		"Attack":
 
@@ -568,7 +658,7 @@ func physical_attack(
 	selected_target: Dictionary = {}
 ) -> void:
 
-	var target = resolve_attack_target(selected_target)
+	var target = resolve_reachable_target(actor, selected_target)
 
 	if target.is_empty():
 		return
@@ -765,7 +855,7 @@ func power_attack(
 ) -> void:
 
 	var target = (
-		get_first_living_enemy()
+		resolve_reachable_target(actor)
 	)
 
 	if target.is_empty():
@@ -826,7 +916,7 @@ func rage(
 ) -> void:
 
 	var target = (
-		get_first_living_enemy()
+		resolve_reachable_target(actor)
 	)
 
 	if target.is_empty():
@@ -859,7 +949,7 @@ func backstab(
 ) -> void:
 
 	var target = (
-		get_first_living_enemy()
+		resolve_reachable_target(actor)
 	)
 
 	if target.is_empty():
@@ -928,7 +1018,7 @@ func flurry(
 ) -> void:
 
 	var target = (
-		get_first_living_enemy()
+		resolve_reachable_target(actor)
 	)
 
 	if target.is_empty():
@@ -1309,7 +1399,7 @@ func resolve_enemy_action(
 	party: Array
 ) -> void:
 
-	if enemy["hp"] <= 0:
+	if not can_act(enemy):
 		return
 
 	var living_party = get_living_party(party)
@@ -1325,6 +1415,9 @@ func resolve_enemy_action(
 		add_log(enemy["name"] + " is stunned.")
 		return
 	var target = select_enemy_target(enemy, living_party)
+	if target.is_empty():
+		add_log(str(enemy.get("name", "Enemy")) + " has no reachable target.")
+		return
 	var hit_chance = get_enemy_hit_chance(enemy, target)
 
 	if randf() > hit_chance:
@@ -1474,6 +1567,7 @@ func add_threat_from_damage(actor: Dictionary, damage: int, multiplier: float = 
 			add_threat(enemy, actor, float(damage), multiplier)
 
 func select_enemy_target(enemy: Dictionary, living_party: Array) -> Dictionary:
+	living_party = reachable_targets(enemy, living_party)
 	var forced_key = effects.forced_target(enemy)
 	for member in living_party:
 		if int(member.get("hp", 0)) > 0 and combatant_key(member) == forced_key:
@@ -1538,7 +1632,7 @@ func warrior_shield_bash(actor: Dictionary, selected_target: Dictionary = {}) ->
 	if not has_equipped_shield(actor):
 		add_log(actor.get("name", "Warrior") + " needs a shield for Shield Bash.")
 		return false
-	var enemy = resolve_attack_target(selected_target)
+	var enemy = resolve_reachable_target(actor, selected_target, "melee")
 	if enemy.is_empty():
 		return false
 	ensure_warrior_tank_presence(actor)
@@ -1599,7 +1693,7 @@ func resolve_warrior_block(actor: Dictionary, attacker: Dictionary, block_roll: 
 func warrior_disarm(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
 	if not warrior_tank_unlocked(actor, 40):
 		return false
-	var enemy = resolve_attack_target(selected_target)
+	var enemy = resolve_reachable_target(actor, selected_target, "")
 	if enemy.is_empty():
 		return false
 	if not use_combat_resource(actor, "warrior_disarm", 8, 5):
@@ -1664,7 +1758,7 @@ func paladin_valiant_protector_mitigate(target: Dictionary, damage: int, party: 
 func paladin_shield_bash(actor: Dictionary, selected_target: Dictionary = {}) -> bool:
 	if not paladin_tank_unlocked(actor, 10) or not has_equipped_shield(actor):
 		return false
-	var enemy = resolve_attack_target(selected_target)
+	var enemy = resolve_reachable_target(actor, selected_target, "melee")
 	if enemy.is_empty():
 		return false
 	ensure_paladin_tank_presence(actor)
