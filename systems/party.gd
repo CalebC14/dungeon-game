@@ -2,8 +2,9 @@ class_name PartySystem
 extends RefCounted
 
 const SLOT_NAMES = ["Front left", "Front center", "Front right", "Rear left", "Rear center", "Rear right"]
-const SAVE_VERSION = 1
+const SAVE_VERSION = 2
 var roster: Array = []
+var inventory: Array = []
 var slots: Array = ["", "", "", "", "", ""]
 
 func register_character(character: Dictionary) -> bool:
@@ -13,8 +14,14 @@ func register_character(character: Dictionary) -> bool:
 		character["character_id"] = id
 	if not find_character(id).is_empty():
 		return false
+	collect_legacy_inventory(character)
 	roster.append(character)
 	return true
+
+# Called once at registration or restore; equipped items remain individual.
+func collect_legacy_inventory(character: Dictionary):
+	inventory.append_array(character.get("inventory", []))
+	character["inventory"] = []
 
 func find_character(id: String) -> Dictionary:
 	for character in roster:
@@ -64,17 +71,20 @@ func delete_character(id: String, at_guild: bool) -> bool:
 	for i in range(roster.size()):
 		if roster[i].get("character_id", "") == id:
 			remove_member(id, true)
+			for item in roster[i].get("equipment", {}).values():
+				if item != null:
+					inventory.append(item)
 			roster.remove_at(i)
 			return true
 	return false
 
 func to_data() -> Dictionary:
-	return {"version": SAVE_VERSION, "roster": roster.duplicate(true), "slots": slots.duplicate()}
+	return {"version": SAVE_VERSION, "roster": roster.duplicate(true), "slots": slots.duplicate(), "inventory": inventory.duplicate()}
 
 # Validate before replacing live state. IDs, holes, and character state survive
 # a JSON round trip without relying on shared dictionary references.
 func restore(data: Dictionary) -> bool:
-	if data.get("version") != SAVE_VERSION or not data.get("roster") is Array or not data.get("slots") is Array:
+	if (data.get("version") != 1 and data.get("version") != SAVE_VERSION) or not data.get("roster") is Array or not data.get("slots") is Array:
 		return false
 	var incoming: Array = data["slots"]
 	if incoming.size() != 6:
@@ -95,6 +105,21 @@ func restore(data: Dictionary) -> bool:
 			if not ids.has(id) or occupied.has(id):
 				return false
 			occupied.append(id)
+	var shared = data.get("inventory", [])
+	if not shared is Array or (data.get("version") == SAVE_VERSION and not data.has("inventory")):
+		return false
+	for item in shared:
+		if not item is String:
+			return false
+	for character in data["roster"]:
+		if not character.get("inventory", []) is Array:
+			return false
+		for item in character.get("inventory", []):
+			if not item is String:
+				return false
 	roster = data["roster"].duplicate(true)
 	slots = incoming.duplicate()
+	inventory = shared.duplicate()
+	for character in roster:
+		collect_legacy_inventory(character)
 	return true

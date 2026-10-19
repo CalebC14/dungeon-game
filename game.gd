@@ -122,79 +122,56 @@ var inn_message: String = ""
 # INVENTORY / EQUIPMENT
 # ============================================================
 
-func open_inventory(
-	return_state
-):
+func inventory_at_guild() -> bool:
+	return inventory_return_state in [GameState.GUILD, GameState.PARTY_SELECT]
 
-	if party.is_empty():
+func get_management_members() -> Array:
+	return roster if inventory_at_guild() else party
+
+func open_inventory(return_state):
+	if game_state == GameState.COMBAT or return_state == GameState.COMBAT:
 		return
-
 	inventory_return_state = return_state
-	inventory_character_index = clamp(
-		inventory_character_index,
-		0,
-		party.size() - 1
-	)
+	var members = get_management_members()
+	if members.is_empty():
+		return
+	inventory_character_index = clampi(inventory_character_index, 0, members.size() - 1)
+	inventory_page = 0
+	inventory_mode = "bag"
 	inventory_message = ""
-
 	game_state = GameState.INVENTORY
 	queue_redraw()
 
+func clamp_inventory_page():
+	inventory_page = clampi(inventory_page, 0, maxi(0, int((party_system.inventory.size() - 1) / 9)))
 
 func handle_inventory_input(event):
-
-	if not event.is_pressed() or event.is_echo():
+	if game_state != GameState.INVENTORY or not event.is_pressed() or event.is_echo():
 		return
-
+	var members = get_management_members()
 	if event.keycode == KEY_ESCAPE:
-
 		game_state = inventory_return_state
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_LEFT:
-
-		if party.size() > 0:
-			inventory_character_index = (
-				inventory_character_index
-				+ party.size()
-				- 1
-			) % party.size()
-
+	elif event.keycode in [KEY_LEFT, KEY_RIGHT]:
+		if not members.is_empty():
+			inventory_character_index = (inventory_character_index + members.size() + (-1 if event.keycode == KEY_LEFT else 1)) % members.size()
 		inventory_message = ""
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_RIGHT:
-
-		if party.size() > 0:
-			inventory_character_index = (
-				inventory_character_index
-				+ 1
-			) % party.size()
-
+	elif event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]:
+		inventory_page += -1 if event.keycode == KEY_PAGEUP else 1
+		clamp_inventory_page()
+	elif event.keycode in [KEY_B, KEY_E, KEY_D]:
+		inventory_mode = "bag" if event.keycode == KEY_B else ("equipment" if event.keycode == KEY_E else "details")
 		inventory_message = ""
-		queue_redraw()
-		return
-
-	var item_index = number_key_to_roster_index(
-		event.keycode
-	)
-
-	if item_index == -1:
-		return
-
-	var member = party[
-		inventory_character_index
-	]
-
-	inventory_message = (
-		inventory_system.use_inventory_item(
-			member,
-			item_index
-		)
-	)
-
+	else:
+		var choice = number_key_to_roster_index(event.keycode)
+		if choice < 0 or members.is_empty():
+			return
+		inventory_character_index = clampi(inventory_character_index, 0, members.size() - 1)
+		var member = members[inventory_character_index]
+		if inventory_mode == "equipment":
+			inventory_message = inventory_system.unequip_item(member, InventorySystem.EQUIPMENT_SLOTS[choice], false, inventory_at_guild())
+		elif inventory_mode == "bag":
+			inventory_message = inventory_system.use_inventory_item(member, inventory_page * 9 + choice, false, inventory_at_guild())
+		clamp_inventory_page()
 	queue_redraw()
 
 
@@ -215,6 +192,8 @@ var training_choosing_specialization: bool = false
 
 var inventory_character_index: int = 0
 var inventory_message: String = ""
+var inventory_page: int = 0
+var inventory_mode: String = "bag"
 var inventory_return_state = GameState.CITY
 
 # ============================================================
@@ -223,16 +202,22 @@ var inventory_return_state = GameState.CITY
 
 var shop_id: String = "general_store"
 var shop_mode: String = "buy"
-var shop_character_index: int = 0
+var shop_page: int = 0
 var shop_message: String = ""
 
 # ============================================================
 # STARTUP
 # ============================================================
 
+func bind_party_services():
+	combat.formation = party_system
+	inventory_system.party_model = party_system
+	shop_system.inventory_system = inventory_system
+	loot_system.inventory_system = inventory_system
+
 func _ready():
 
-	combat.formation = party_system
+	bind_party_services()
 
 	randomize()
 
@@ -263,6 +248,10 @@ func reset_character_creator():
 # ============================================================
 
 func _input(event):
+
+	if not formation_menu_open and event.is_pressed() and not event.is_echo() and event.keycode == KEY_I and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN]:
+		open_inventory(game_state)
+		return
 
 	if formation_menu_open:
 		handle_formation_menu_input(event)
@@ -559,7 +548,7 @@ func load_test_roster():
 	if not is_at_guild():
 		return
 	party_system = PartyScript.new()
-	combat.formation = party_system
+	bind_party_services()
 	for member in TestParty.create():
 		party_system.register_character(member)
 		party_system.assign_member(str(member["character_id"]), party_system.roster.size() - 1, true)
@@ -1597,67 +1586,47 @@ func remove_quest_item(item_id: String) -> void:
 # ============================================================
 
 func enter_shop():
-
 	if party.is_empty():
 		city.set_message("You need a party before shopping.")
 		return
-
 	shop_mode = "buy"
-	shop_character_index = clamp(shop_character_index, 0, party.size() - 1)
-	shop_message = "Welcome. Buy what you need; sell what you do not."
+	shop_page = 0
+	shop_message = "Buy for the shared inventory; sell unequipped items."
 	game_state = GameState.SHOP
 	queue_redraw()
 
+func get_shop_choices() -> Array:
+	return shop_system.get_stock(shop_id) if shop_mode == "buy" else party_system.inventory
+
+func clamp_shop_page():
+	shop_page = clampi(shop_page, 0, maxi(0, int((get_shop_choices().size() - 1) / 9)))
 
 func handle_shop_input(event):
-
-	if not event.is_pressed() or event.is_echo():
+	if game_state != GameState.SHOP or not event.is_pressed() or event.is_echo():
 		return
-
 	if event.keycode == KEY_ESCAPE:
 		game_state = GameState.CITY
 		city.set_message("You leave the General Store.")
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_B:
-		shop_mode = "buy"
-		shop_message = "Choose an item to buy."
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_S:
-		shop_mode = "sell"
-		shop_message = "Choose an item from the selected adventurer's pack."
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_LEFT:
-		shop_character_index = (shop_character_index + party.size() - 1) % party.size()
+	elif event.keycode in [KEY_B, KEY_S]:
+		shop_mode = "buy" if event.keycode == KEY_B else "sell"
+		shop_page = 0
 		shop_message = ""
-		queue_redraw()
-		return
-
-	if event.keycode == KEY_RIGHT:
-		shop_character_index = (shop_character_index + 1) % party.size()
-		shop_message = ""
-		queue_redraw()
-		return
-
-	var choice = number_key_to_roster_index(event.keycode)
-	if choice == -1:
-		return
-
-	var member = party[shop_character_index]
-
-	if shop_mode == "buy":
-		var stock = shop_system.get_stock(shop_id)
-		if choice >= stock.size():
-			return
-		shop_message = shop_system.buy_item(shop_id, member, stock[choice], progression)
+	elif event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]:
+		shop_page += -1 if event.keycode == KEY_PAGEUP else 1
+		clamp_shop_page()
 	else:
-		shop_message = shop_system.sell_item(shop_id, member, choice, progression)
-
+		var choice = number_key_to_roster_index(event.keycode)
+		if choice < 0:
+			return
+		var index = shop_page * 9 + choice
+		var choices = get_shop_choices()
+		if index >= choices.size():
+			return
+		if shop_mode == "buy":
+			shop_message = shop_system.buy_item(shop_id, {}, str(choices[index]), progression)
+		else:
+			shop_message = shop_system.sell_item(shop_id, {}, index, progression)
+		clamp_shop_page()
 	queue_redraw()
 
 
@@ -2030,11 +1999,11 @@ func handle_current_dungeon_event() -> bool:
 		var gold = int(event.get("gold", 0))
 		var item_id = str(event.get("item_id", ""))
 		if item_id != "":
-			var receiver = add_item_to_first_available_party_member(item_id)
-			if receiver != "":
-				dungeon.message += " " + receiver + " takes the item."
+			var collected = add_item_to_shared_inventory(item_id)
+			if collected:
+				dungeon.message += " The item is added to the shared inventory."
 			else:
-				dungeon.message += " No one has room for the item, so the treasure remains here."
+				dungeon.message += " The item could not be collected, so the treasure remains here."
 				return true
 		if gold > 0:
 			progression.add_gold(gold)
@@ -2045,13 +2014,8 @@ func handle_current_dungeon_event() -> bool:
 	return true
 
 
-func add_item_to_first_available_party_member(item_id: String) -> String:
-	for member in party:
-		if int(member.get("hp", 0)) <= 0:
-			continue
-		if inventory_system.add_item(member, item_id):
-			return str(member.get("name", "An adventurer"))
-	return ""
+func add_item_to_shared_inventory(item_id: String) -> bool:
+	return inventory_system.add_item({}, item_id)
 
 
 func check_for_encounter():
@@ -2575,20 +2539,10 @@ func clear_all_combat_flags():
 # ============================================================
 
 func _draw():
-
+	draw_rect(get_viewport_rect(), Color("#111118"))
 	if formation_menu_open:
 		draw_formation_menu()
 		return
-
-	draw_rect(
-		Rect2(
-			0,
-			0,
-			1152,
-			648
-		),
-		Color("#111118")
-	)
 
 	match game_state:
 
@@ -2758,7 +2712,7 @@ func draw_roster_page():
 func draw_guild():
 	draw_header("THE ADVENTURERS' GUILD")
 	draw_roster_page()
-	draw_string(ThemeDB.fallback_font, Vector2(80, 430), "[C] CREATE CHARACTER    [P] ASSEMBLE PARTY")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 430), "[C] CREATE CHARACTER    [P] ASSEMBLE PARTY    [I] MANAGE")
 	draw_string(ThemeDB.fallback_font, Vector2(80, 465), "[D] DELETE LAST CHARACTER    [T] QUICK TEST PARTY")
 	if party_system.can_adventure():
 		draw_string(ThemeDB.fallback_font, Vector2(80, 500), "[L] LEAVE GUILD")
@@ -3553,67 +3507,22 @@ func draw_inn():
 # ============================================================
 
 func draw_shop():
-
-	if party.is_empty():
-		return
-
-	var member = party[shop_character_index]
-	var shop = shop_system.get_shop(shop_id)
-
-	draw_header(shop.get("name", "GENERAL STORE").to_upper())
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 120),
-		"PARTY GOLD: " + str(progression.get_party_gold())
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 150),
-		"SHOPPING FOR: " + member["name"] + " — " + member["class"]
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 185),
-		"MODE: " + shop_mode.to_upper()
-	)
-
-	if shop_mode == "buy":
-		var stock = shop_system.get_stock(shop_id)
-		for i in range(min(stock.size(), 9)):
-			var item_id = stock[i]
-			var item = ItemData.ITEMS[item_id]
-			var details = get_shop_item_details(item)
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(100, 225 + i * 32),
-				str(i + 1) + ") " + item["name"] + "   "
-				+ str(shop_system.get_buy_price(item_id)) + "g   " + details
-			)
-	else:
-		for i in range(min(member["inventory"].size(), 9)):
-			var item_id = member["inventory"][i]
-			var item = ItemData.ITEMS[item_id]
-			draw_string(
-				ThemeDB.fallback_font,
-				Vector2(100, 225 + i * 32),
-				str(i + 1) + ") " + item["name"] + "   SELL "
-				+ str(shop_system.get_sell_price(shop_id, item_id)) + "g"
-			)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 535),
-		shop_message
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 575),
-		"[B] BUY   [S] SELL   [LEFT/RIGHT] CHARACTER   [1-9] SELECT   [ESC] CITY"
-	)
+	draw_header(str(shop_system.get_shop(shop_id).get("name", "GENERAL STORE")).to_upper())
+	draw_string(ThemeDB.fallback_font, Vector2(60, 120), "PARTY GOLD: " + str(progression.get_party_gold()) + "   SHARED ITEMS: " + str(party_system.inventory.size()))
+	draw_string(ThemeDB.fallback_font, Vector2(60, 160), "MODE: " + shop_mode.to_upper() + "   Page " + str(shop_page + 1))
+	clamp_shop_page()
+	var choices = get_shop_choices()
+	for i in range(shop_page * 9, mini(choices.size(), (shop_page + 1) * 9)):
+		var item_id = choices[i]
+		var item: Dictionary = ItemData.ITEMS.get(item_id, {})
+		var price = shop_system.get_buy_price(item_id) if shop_mode == "buy" else shop_system.get_sell_price(shop_id, item_id)
+		var text = "%d) %s  %dg" % [i % 9 + 1, item.get("name", item_id), price]
+		if shop_mode == "buy":
+			text += "  " + get_shop_item_details(item)
+		draw_string(ThemeDB.fallback_font, Vector2(80, 210 + (i % 9) * 30), text)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 520), shop_message)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 560), "[B] Buy  [S] Sell  [PgUp/PgDn] Page  [1-9] Select")
+	draw_string(ThemeDB.fallback_font, Vector2(60, 590), "[I] Party management  [Esc] City")
 
 
 func get_shop_item_details(item: Dictionary) -> String:
@@ -3644,129 +3553,58 @@ func get_shop_item_details(item: Dictionary) -> String:
 # ============================================================
 
 func draw_inventory_screen():
-
-	if party.is_empty():
+	var members = get_management_members()
+	if members.is_empty():
 		return
+	inventory_character_index = clampi(inventory_character_index, 0, members.size() - 1)
+	var member = members[inventory_character_index]
+	inventory_system.ensure_character_inventory(member)
+	var slot = party_system.slots.find(member["character_id"])
+	var position = "Guild reserve" if slot < 0 else PartyScript.SLOT_NAMES[slot]
+	draw_header("PARTY — " + str(member["name"]).to_upper())
+	draw_string(ThemeDB.fallback_font, Vector2(60, 110), "%s %s  LV %d  %s  [%s]" % [member.get("race", ""), member.get("class", ""), member.get("level", 1), member.get("specialization", ""), position])
+	draw_string(ThemeDB.fallback_font, Vector2(60, 145), "HP %d/%d   SP %d/%d   XP %d   GOLD %d" % [member.get("hp", 0), member.get("max_hp", 0), member.get("sp", 0), member.get("max_sp", 0), member.get("xp", 0), progression.get_party_gold()])
+	draw_string(ThemeDB.fallback_font, Vector2(60, 180), "[B] Shared bag   [E] Equipment   [D] Details   — " + inventory_mode.to_upper())
+	if inventory_mode == "bag":
+		clamp_inventory_page()
+		var bag = party_system.inventory
+		for i in range(inventory_page * 9, mini(bag.size(), (inventory_page + 1) * 9)):
+			var item: Dictionary = ItemData.ITEMS.get(bag[i], {})
+			var text = "%d) %s — %s" % [i % 9 + 1, item.get("name", bag[i]), item.get("type", "unknown")]
+			if item.get("type", "") == "equipment" and not inventory_system.can_equip(member, item):
+				text += " [class restricted]"
+			draw_string(ThemeDB.fallback_font, Vector2(80, 220 + (i % 9) * 29), text)
+		if bag.is_empty():
+			draw_string(ThemeDB.fallback_font, Vector2(80, 220), "The shared inventory is empty.")
+		draw_string(ThemeDB.fallback_font, Vector2(60, 495), "[1-9] Equip / use on selected character   [PgUp/PgDn] Page %d/%d" % [inventory_page + 1, maxi(1, ceili(bag.size() / 9.0))])
+	elif inventory_mode == "equipment":
+		for i in range(InventorySystem.EQUIPMENT_SLOTS.size()):
+			var equipment_slot = InventorySystem.EQUIPMENT_SLOTS[i]
+			var item_id = member["equipment"][equipment_slot]
+			var name_text = str(ItemData.ITEMS.get(item_id, {}).get("name", "Empty"))
+			draw_string(ThemeDB.fallback_font, Vector2(80, 220 + i * 29), "%d) %s: %s" % [i + 1, equipment_slot.replace("_", " ").capitalize(), name_text])
+		draw_string(ThemeDB.fallback_font, Vector2(60, 495), "[1-9] Unequip to shared inventory")
+	else:
+		draw_character_details(member)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 530), inventory_message, HORIZONTAL_ALIGNMENT_LEFT, 680)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 565), "[Left/Right] Character   [F] Formation   [Esc] Return")
 
-	var member = party[
-		inventory_character_index
-	]
-
-	draw_header(
-		"INVENTORY — "
-		+ member["name"].to_upper()
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 120),
-		member["race"]
-		+ " "
-		+ member["class"]
-		+ "   LV "
-		+ str(member["level"])
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 155),
-		"EQUIPMENT"
-	)
-
-	var equipment = member["equipment"]
-
-	var equipment_rows = [
-		["Weapon", "weapon"],
-		["Off Hand", "off_hand"],
-		["Head", "head"],
-		["Body", "body"],
-		["Hands", "hands"],
-		["Feet", "feet"],
-		["Accessory 1", "accessory_1"],
-		["Accessory 2", "accessory_2"],
-		["Trinket", "trinket"]
-	]
-
-	for i in range(equipment_rows.size()):
-
-		var row = equipment_rows[i]
-		var item_id = equipment[row[1]]
-		var item_name = "—"
-
-		if item_id != null:
-			item_name = ItemData.ITEMS[item_id]["name"]
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				90,
-				185 + i * 27
-			),
-			row[0]
-			+ ": "
-			+ item_name
-		)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(430, 155),
-		"PACK"
-	)
-
-	for i in range(
-		min(
-			member["inventory"].size(),
-			9
-		)
-	):
-
-		var item_id = member["inventory"][i]
-		var item = ItemData.ITEMS[item_id]
-
-		draw_string(
-			ThemeDB.fallback_font,
-			Vector2(
-				450,
-				190 + i * 30
-			),
-			str(i + 1)
-			+ ") "
-			+ item["name"]
-			+ " — "
-			+ item["type"].to_upper()
-		)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 455),
-		"ARMOR: "
-		+ str(
-			inventory_system.get_total_armor(
-				member
-			)
-		)
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 485),
-		"WEAPON DAMAGE: "
-		+ inventory_system.get_weapon_damage_text(
-			member
-		)
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 525),
-		inventory_message
-	)
-
-	draw_string(
-		ThemeDB.fallback_font,
-		Vector2(80, 575),
-		"[LEFT/RIGHT] CHARACTER   [1-9] EQUIP / USE   [ESC] RETURN"
-	)
+func draw_character_details(member: Dictionary):
+	draw_string(ThemeDB.fallback_font, Vector2(80, 220), "STR %d   INT %d   DEX %d   CON %d   LCK %d" % [member.get("str", 0), member.get("int", 0), member.get("dex", 0), member.get("con", 0), member.get("lck", 0)])
+	draw_string(ThemeDB.fallback_font, Vector2(80, 250), inventory_system.get_combat_summary(member))
+	var conditions: Array[String] = []
+	if bool(member.get("dead", false)):
+		conditions.append("Dead")
+	elif int(member.get("hp", 0)) <= 0:
+		conditions.append("Incapacitated")
+	for effect in member.get("effects", []):
+		conditions.append(str(effect.get("id", "Effect")))
+	draw_string(ThemeDB.fallback_font, Vector2(80, 280), "Conditions: " + ("None" if conditions.is_empty() else ", ".join(conditions)), HORIZONTAL_ALIGNMENT_LEFT, 650)
+	draw_string(ThemeDB.fallback_font, Vector2(80, 310), "Race trait: " + str(member.get("race_trait", "None")), HORIZONTAL_ALIGNMENT_LEFT, 650)
+	var skills = get_combat_skill_options(member)
+	for i in range(mini(skills.size(), 7)):
+		var skill = skills[i]
+		draw_string(ThemeDB.fallback_font, Vector2(80, 345 + i * 22), "%s   SP %d   Cooldown %d" % [skill["name"], skill["cost"], skill["cooldown"]])
 
 
 # ============================================================
@@ -4385,7 +4223,7 @@ func draw_party_panel():
 			60,
 			495
 		),
-		"PARTY [F: FORMATION]     GOLD: "
+		"PARTY [I: MANAGE] [F: FORMATION]     GOLD: "
 		+ str(
 			progression.get_party_gold()
 		)

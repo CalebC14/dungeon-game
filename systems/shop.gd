@@ -43,7 +43,7 @@ func buy_item(
 	if not progression.can_afford(price):
 		return "The party does not have enough gold."
 
-	if character["inventory"].size() >= InventorySystem.MAX_INVENTORY_SLOTS:
+	if inventory_system.party_model == null and inventory_system.get_inventory(character).size() >= InventorySystem.MAX_INVENTORY_SLOTS:
 		return character["name"] + "'s pack is full."
 
 	if not progression.spend_gold(price):
@@ -53,7 +53,7 @@ func buy_item(
 		progression.add_gold(price)
 		return "The item could not be added to the pack."
 
-	return character["name"] + " buys " + ItemData.ITEMS[item_id]["name"] + " for " + str(price) + " gold."
+	return "The party buys " + ItemData.ITEMS[item_id]["name"] + " for " + str(price) + " gold."
 
 func sell_item(
 	shop_id: String,
@@ -61,10 +61,10 @@ func sell_item(
 	inventory_index: int,
 	progression: ProgressionSystem
 ) -> String:
-	if inventory_index < 0 or inventory_index >= character["inventory"].size():
+	if inventory_index < 0 or inventory_index >= inventory_system.get_inventory(character).size():
 		return "That inventory slot is empty."
 
-	var item_id = character["inventory"][inventory_index]
+	var item_id = inventory_system.get_inventory(character)[inventory_index]
 	if not ItemData.ITEMS.has(item_id):
 		return "That item cannot be sold."
 
@@ -72,7 +72,7 @@ func sell_item(
 	if price <= 0:
 		return ItemData.ITEMS[item_id]["name"] + " has no resale value."
 
-	character["inventory"].remove_at(inventory_index)
+	inventory_system.get_inventory(character).remove_at(inventory_index)
 	progression.add_gold(price)
 
-	return character["name"] + " sells " + ItemData.ITEMS[item_id]["name"] + " for " + str(price) + " gold."
+	return "The party sells " + ItemData.ITEMS[item_id]["name"] + " for " + str(price) + " gold."

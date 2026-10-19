@@ -19,6 +19,13 @@ func roll_combat_loot(enemies: Array, party: Array) -> Dictionary:
 			continue
 		dropped.append(item_id)
 
+		if inventory_system.party_model != null:
+			if inventory_system.add_item({}, item_id):
+				received.append({"item_id": item_id, "character": "Party inventory"})
+			else:
+				lost.append(item_id)
+			continue
+
 		var receiver = find_receiver(party)
 		if receiver.is_empty():
 			lost.append(item_id)
