@@ -13,6 +13,7 @@ var events: Dictionary = {}
 # These survive leaving and returning to a dungeon during the same game.
 var defeated_fixed_encounters: Dictionary = {}
 var consumed_permanent_events: Dictionary = {}
+var rogue_attempts: Dictionary = {}
 
 # These reset when a new dungeon expedition begins.
 var consumed_expedition_events: Dictionary = {}
@@ -158,3 +159,7 @@ func consume_current_event(per_expedition: bool = false) -> void:
 		consumed_expedition_events[event_id] = true
 	else:
 		consumed_permanent_events[event_id] = true
+
+# Optional objects use current-tile interaction and never block movement.
+func get_rogue_object() -> Dictionary:
+	return dungeon_data.get("rogue_objects", {}).get(player_pos, {})

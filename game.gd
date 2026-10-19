@@ -79,6 +79,10 @@ var party: Array:
 var roster_page: int = 0
 var selected_formation_slot: int = 0
 var party_message: String = ""
+var rogue_skills_open: bool = false
+var rogue_character_index: int = 0
+var rogue_selected_skill: String = "pick_lock"
+var rogue_message: String = ""
 var formation_menu_open: bool = false
 var formation_source: int = -1
 const ROSTER_PAGE_SIZE = 9
@@ -262,6 +266,13 @@ func _input(event):
 		else:
 			load_game()
 		queue_redraw()
+		return
+
+	if rogue_skills_open:
+		handle_rogue_skills_input(event)
+		return
+	if not formation_menu_open and not developer_menu_open and game_state == GameState.DUNGEON and event.is_pressed() and not event.is_echo() and event.keycode == KEY_R:
+		open_rogue_skills()
 		return
 
 	if not formation_menu_open and event.is_pressed() and not event.is_echo() and event.keycode == KEY_I and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN, GameState.TEMPLE]:
@@ -1959,6 +1970,9 @@ func check_dungeon_tile():
 
 
 func activate_dungeon_transition():
+	if not dungeon.get_rogue_object().is_empty():
+		open_rogue_skills()
+		return
 
 	var transition = dungeon.get_current_transition()
 
@@ -2541,6 +2555,9 @@ func clear_all_combat_flags():
 
 func _draw():
 	draw_rect(get_viewport_rect(), Color("#111118"))
+	if rogue_skills_open:
+		draw_rogue_skills()
+		return
 	if formation_menu_open:
 		draw_formation_menu()
 		return
@@ -3612,6 +3629,9 @@ func draw_character_details(member: Dictionary):
 		draw_string(ThemeDB.fallback_font, Vector2(80, 345 + i * 22), "%s   SP %d   Cooldown %d" % [skill["name"], skill["cost"], skill["cooldown"]])
 
 
+	if str(member.get("class", "")) == "Rogue":
+		draw_string(ThemeDB.fallback_font, Vector2(80, 495), "Exploration: Pick Lock, Disarm Trap")
+
 # ============================================================
 # DRAW TRAINING HALL
 # ============================================================
@@ -4319,11 +4339,14 @@ func draw_status():
 	draw_string(
 		ThemeDB.fallback_font,
 		Vector2(780, 130),
-		"[I] INVENTORY" + ("     [G] LEAVE DUNGEON" if dungeon.dungeon_id == "abandoned_warehouse" else "")
+		"[I] Inventory  [R] Skills" + ("  [G] Exit" if dungeon.dungeon_id == "abandoned_warehouse" else "")
 	)
 
-	if dungeon.message != "":
-		var message_lines = wrap_ui_text(dungeon.message, 44)
+	var display_message = dungeon.message
+	if display_message.is_empty() and not dungeon.get_rogue_object().is_empty():
+		display_message = str(dungeon.get_rogue_object()["name"]) + ". [Enter] Rogue Skills."
+	if display_message != "":
+		var message_lines = wrap_ui_text(display_message, 44)
 		for i in range(min(3, message_lines.size())):
 			draw_string(
 				ThemeDB.fallback_font,
@@ -4711,7 +4734,8 @@ func capture_save() -> Dictionary:
 		"dungeon": {"id": dungeon.dungeon_id, "position": dungeon.player_pos, "facing": dungeon.facing,
 			"defeated": dungeon.defeated_fixed_encounters.duplicate(true),
 			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
-			"expedition_events": dungeon.consumed_expedition_events.duplicate(true)}
+			"expedition_events": dungeon.consumed_expedition_events.duplicate(true),
+			"rogue_attempts": dungeon.rogue_attempts.duplicate(true)}
 	}
 
 func save_game() -> bool:
@@ -4766,6 +4790,9 @@ func restore_save(data: Dictionary) -> bool:
 	for field in ["defeated", "permanent_events", "expedition_events"]:
 		if not data["dungeon"].get(field) is Dictionary:
 			return false
+	if not RogueSkills.valid_records(data["dungeon"].get("rogue_attempts", {})):
+		return false
+	restored_dungeon.rogue_attempts = data["dungeon"].get("rogue_attempts", {}).duplicate(true)
 	restored_dungeon.defeated_fixed_encounters = data["dungeon"]["defeated"].duplicate(true)
 	restored_dungeon.consumed_permanent_events = data["dungeon"]["permanent_events"].duplicate(true)
 	restored_dungeon.consumed_expedition_events = data["dungeon"]["expedition_events"].duplicate(true)
@@ -4789,6 +4816,8 @@ func restore_save(data: Dictionary) -> bool:
 	combat_skills_open = false
 	combat_target_open = false
 	formation_menu_open = false
+	rogue_skills_open = false
+	rogue_message = ""
 	developer_menu_open = false
 	inventory_character_index = 0
 	roster_page = 0
@@ -4821,3 +4850,71 @@ func draw_temple():
 	draw_string(ThemeDB.fallback_font, Vector2(60, 225), "Resurrection restores 1 HP. Service is free.")
 	draw_string(ThemeDB.fallback_font, Vector2(60, 285), temple_message, HORIZONTAL_ALIGNMENT_LEFT, 1000)
 	draw_string(ThemeDB.fallback_font, Vector2(60, 400), "[Left/Right] Character   [Enter] Resurrect   [Esc] City")
+
+
+func get_active_rogues() -> Array:
+	var rogues: Array = []
+	for member in party:
+		if str(member.get("class", "")) == "Rogue":
+			rogues.append(member)
+	return rogues
+
+func open_rogue_skills():
+	if game_state != GameState.DUNGEON:
+		return
+	rogue_skills_open = true
+	rogue_character_index = 0
+	rogue_selected_skill = "pick_lock"
+	rogue_message = ""
+	queue_redraw()
+
+func handle_rogue_skills_input(event):
+	if game_state != GameState.DUNGEON or not event.is_pressed() or event.is_echo():
+		return
+	var rogues = get_active_rogues()
+	if event.keycode == KEY_ESCAPE:
+		rogue_skills_open = false
+	elif event.keycode in [KEY_LEFT, KEY_RIGHT] and not rogues.is_empty():
+		rogue_character_index = (rogue_character_index + rogues.size() + (-1 if event.keycode == KEY_LEFT else 1)) % rogues.size()
+		rogue_message = ""
+	elif event.keycode in [KEY_1, KEY_2]:
+		rogue_selected_skill = "pick_lock" if event.keycode == KEY_1 else "disarm_trap"
+		rogue_message = ""
+	elif event.keycode == KEY_ENTER and not rogues.is_empty():
+		rogue_character_index = clampi(rogue_character_index, 0, rogues.size() - 1)
+		var result = RogueSkills.attempt(party_system, dungeon, rogues[rogue_character_index], rogue_selected_skill)
+		progression.add_gold(int(result.get("gold", 0)))
+		rogue_message = str(result["message"])
+		if int(result.get("gold", 0)) > 0:
+			rogue_message += " +%d gold." % int(result["gold"])
+		dungeon.message = rogue_message
+		if combat.party_defeated(party):
+			rogue_skills_open = false
+			combat_result_text = "THE PARTY HAS FALLEN.\n\nGame over. Reload the last save to continue."
+			game_state = GameState.COMBAT_RESULT
+	queue_redraw()
+
+func draw_rogue_skills():
+	draw_header("ROGUE SKILLS")
+	var rogues = get_active_rogues()
+	var actor: Dictionary = {}
+	if not rogues.is_empty():
+		rogue_character_index = clampi(rogue_character_index, 0, rogues.size() - 1)
+		actor = rogues[rogue_character_index]
+	draw_string(ThemeDB.fallback_font, Vector2(60, 125), "Rogue: " + str(actor.get("name", "No active Rogue in the party")))
+	var object = dungeon.get_rogue_object()
+	draw_string(ThemeDB.fallback_font, Vector2(60, 165), "Target: " + str(object.get("name", "No lock or trap on this tile")))
+	draw_string(ThemeDB.fallback_font, Vector2(80, 225), ("> " if rogue_selected_skill == "pick_lock" else "  ") + "1) Pick Lock")
+	draw_string(ThemeDB.fallback_font, Vector2(80, 265), ("> " if rogue_selected_skill == "disarm_trap" else "  ") + "2) Disarm Trap")
+	var reason = RogueSkills.unavailable_reason(party_system, dungeon, actor, rogue_selected_skill)
+	var preview = "Success chance: %d%%. One attempt per Rogue per object." % RogueSkills.SUCCESS_CHANCE
+	if not reason.is_empty():
+		preview = reason
+	draw_string(ThemeDB.fallback_font, Vector2(60, 325), preview)
+	var consequence = "Failure: lock stays shut; this Rogue cannot retry."
+	if rogue_selected_skill == "disarm_trap":
+		consequence = "Failure: selected Rogue takes %d damage and cannot retry." % int(object.get("failure_damage", 4))
+	draw_string(ThemeDB.fallback_font, Vector2(60, 365), consequence)
+	for i in range(wrap_ui_text(rogue_message, 90).size()):
+		draw_string(ThemeDB.fallback_font, Vector2(60, 425 + i * 24), wrap_ui_text(rogue_message, 90)[i])
+	draw_string(ThemeDB.fallback_font, Vector2(60, 540), "[Left/Right] Rogue   [1/2] Skill   [Enter] Attempt   [Esc] Back")
