@@ -14,6 +14,7 @@ var events: Dictionary = {}
 var defeated_fixed_encounters: Dictionary = {}
 var consumed_permanent_events: Dictionary = {}
 var rogue_attempts: Dictionary = {}
+var interaction_states: Dictionary = {}
 
 # These reset when a new dungeon expedition begins.
 var consumed_expedition_events: Dictionary = {}
@@ -57,6 +58,9 @@ func move_backward() -> bool:
 
 func move_to(target: Vector2i) -> bool:
 	if not can_move_to(target):
+		var object = get_interaction_at(target)
+		if DungeonInteractions.is_barrier(object):
+			message = str(object.get("name", "Passage")) + " is closed. Face it and press Enter."
 		return false
 	player_pos = target
 	message = ""
@@ -78,10 +82,16 @@ func is_inside_map(pos: Vector2i) -> bool:
 
 func is_wall(pos: Vector2i) -> bool:
 	if not is_inside_map(pos): return true
+	var object = get_interaction_at(pos)
+	if DungeonInteractions.is_barrier(object):
+		return not DungeonInteractions.is_open(self, object)
 	return map[pos.y][pos.x] == "#"
 
 func get_tile(pos: Vector2i) -> String:
 	if not is_inside_map(pos): return "#"
+	var object = get_interaction_at(pos)
+	if DungeonInteractions.is_barrier(object):
+		return "." if DungeonInteractions.is_open(self, object) else "#"
 	return map[pos.y][pos.x]
 
 func get_dungeon_name() -> String:
@@ -166,3 +176,12 @@ func get_rogue_object() -> Dictionary:
 
 func get_exploration_object() -> Dictionary:
 	return dungeon_data.get("exploration_objects", {}).get(player_pos, get_rogue_object())
+
+func get_interaction_at(position: Vector2i) -> Dictionary:
+	return dungeon_data.get("interactions", {}).get(position, {})
+
+func find_interaction(id: String) -> Dictionary:
+	for object in dungeon_data.get("interactions", {}).values():
+		if object.get("id", "") == id:
+			return object
+	return {}

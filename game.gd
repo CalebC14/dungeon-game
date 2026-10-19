@@ -1981,6 +1981,13 @@ func check_dungeon_tile():
 
 
 func activate_dungeon_transition():
+	if game_state != GameState.DUNGEON:
+		return
+	var interaction = DungeonInteractions.interact(dungeon, quest_items)
+	if bool(interaction.get("handled", false)):
+		dungeon.message = str(interaction["message"])
+		queue_redraw()
+		return
 	if not dungeon.get_rogue_object().is_empty():
 		open_rogue_skills()
 		return
@@ -2647,6 +2654,7 @@ func _draw():
 		GameState.DUNGEON:
 
 			draw_dungeon_view()
+			draw_dungeon_interaction()
 			draw_status()
 			draw_map()
 			draw_party_panel()
@@ -4359,6 +4367,9 @@ func draw_status():
 	)
 
 	var display_message = dungeon.message
+	var interaction_hint = DungeonInteractions.describe(dungeon, quest_items)
+	if not interaction_hint.is_empty():
+		display_message = interaction_hint + (" " + display_message if not display_message.is_empty() else "")
 	if display_message.is_empty() and not dungeon.get_exploration_object().is_empty():
 		display_message = str(dungeon.get_exploration_object()["name"]) + ". [Enter] Skills."
 	if display_message != "":
@@ -4418,6 +4429,19 @@ func draw_map():
 					rect,
 					Color("#ffd166")
 				)
+
+			elif DungeonInteractions.available(dungeon, dungeon.get_interaction_at(map_pos)):
+				var object = dungeon.get_interaction_at(map_pos)
+				var color = Color("#67a36c")
+				var label = "L"
+				if object["type"] == "key":
+					color = Color("#d9b44a")
+					label = "K"
+				elif DungeonInteractions.is_barrier(object):
+					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
+					label = "D" if object["type"] == "locked_door" else "S"
+				draw_rect(rect, color)
+				draw_string(ThemeDB.fallback_font, rect.position + Vector2(3, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 
 			elif dungeon.is_wall(
 				map_pos
@@ -4751,7 +4775,8 @@ func capture_save() -> Dictionary:
 			"defeated": dungeon.defeated_fixed_encounters.duplicate(true),
 			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
 			"expedition_events": dungeon.consumed_expedition_events.duplicate(true),
-			"rogue_attempts": dungeon.rogue_attempts.duplicate(true)}
+			"rogue_attempts": dungeon.rogue_attempts.duplicate(true),
+			"interaction_states": dungeon.interaction_states.duplicate(true)}
 	}
 
 func save_game() -> bool:
@@ -4798,6 +4823,10 @@ func restore_save(data: Dictionary) -> bool:
 	var restored_dungeon = DungeonSystem.new()
 	if not restored_city.load_city(str(data["city"].get("id", ""))) or not restored_wilderness.load_wilderness(str(data["wilderness"].get("id", ""))) or not restored_dungeon.load_dungeon(str(data["dungeon"].get("id", ""))):
 		return false
+	# Apply the barrier overlay before validating a saved position on an open door.
+	if not DungeonInteractions.valid_states(data["dungeon"].get("interaction_states", {})):
+		return false
+	restored_dungeon.interaction_states = data["dungeon"].get("interaction_states", {}).duplicate(true)
 	for entry in [[data["city"], restored_city], [data["wilderness"], restored_wilderness], [data["dungeon"], restored_dungeon]]:
 		if not valid_saved_location(entry[0], entry[1]):
 			return false
@@ -5018,3 +5047,23 @@ func draw_class_skills():
 	for i in range(mini(lines.size(), 4)):
 		draw_string(ThemeDB.fallback_font, Vector2(60, 415 + i * 24), lines[i])
 	draw_string(ThemeDB.fallback_font, Vector2(60, 555), "[Left/Right] Character   [1/2] Skill   [Enter] Attempt   [Esc] Back")
+
+
+func draw_dungeon_interaction():
+	var position = dungeon.player_pos + dungeon.get_forward_direction()
+	var barrier = dungeon.get_interaction_at(position)
+	if DungeonInteractions.is_barrier(barrier) and not DungeonInteractions.is_open(dungeon, barrier):
+		var door = Rect2(210, 90, 360, 330)
+		draw_rect(door, Color("#64452f"))
+		draw_rect(door, Color("#cba776"), false, 4)
+		draw_line(Vector2(390, 95), Vector2(390, 415), Color("#cba776"), 3)
+		draw_circle(Vector2(440, 275), 9, Color("#d9b44a"))
+		return
+	var object = DungeonInteractions.target(dungeon)
+	if object.get("type", "") == "lever":
+		draw_rect(Rect2(345, 180, 90, 140), Color("#37424b"))
+		draw_line(Vector2(390, 285), Vector2(420, 215), Color("#d9b44a"), 8)
+	elif object.get("type", "") == "key":
+		draw_circle(Vector2(350, 260), 15, Color("#d9b44a"))
+		draw_line(Vector2(350, 260), Vector2(420, 260), Color("#d9b44a"), 8)
+		draw_line(Vector2(410, 260), Vector2(410, 278), Color("#d9b44a"), 8)
