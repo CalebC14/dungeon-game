@@ -42,6 +42,7 @@ func run_checks():
 	game.party_system.assign_member(characters["Hunter"]["character_id"], 1, true)
 	game.game_state = game.GameState.DUNGEON
 	game.dungeon.player_pos = Vector2i(9,13)
+	game.dungeon.facing = 1 # Face away from the puzzle gate to use the Scout object.
 	key(game, KEY_ENTER)
 	check(game.class_skills_open and game.class_character_index == 0, "object opens menu without auto-selecting best actor")
 	key(game, KEY_ENTER)

@@ -6,7 +6,7 @@ static func state_key(dungeon, object: Dictionary) -> String:
 	return dungeon.dungeon_id + ":" + str(object.get("id", ""))
 
 static func is_barrier(object: Dictionary) -> bool:
-	return object.get("type", "") in ["locked_door", "shortcut", "secret_door"]
+	return object.get("type", "") in ["locked_door", "shortcut", "secret_door", "puzzle_door"]
 
 static func is_open(dungeon, object: Dictionary) -> bool:
 	return bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("open", false))
@@ -63,6 +63,13 @@ static func describe(dungeon, keys: Dictionary) -> String:
 		return ""
 	var name_text = str(object.get("name", "Object"))
 	match object.get("type", ""):
+		"puzzle_switch":
+			var gate = dungeon.find_interaction(str(object.get("puzzle_id", "")))
+			if is_open(dungeon, gate):
+				return name_text + ". The puzzle is solved."
+			return name_text + ". Sun before Moon. [Enter] Press switch."
+		"puzzle_door":
+			return name_text + (" is open." if is_open(dungeon, object) else " is shut. Inscription: Sun before Moon.")
 		"trap":
 			return name_text + (". [R] Disarm Trap, or walk around it." if trap_active(dungeon, object) else " is safe (disarmed or spent).")
 		"key":
@@ -103,6 +110,25 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 	var key = state_key(dungeon, object)
 	var name_text = str(object.get("name", "Object"))
 	match object.get("type", ""):
+		"puzzle_switch":
+			var gate = dungeon.find_interaction(str(object.get("puzzle_id", "")))
+			if gate.get("type", "") != "puzzle_door" or object.get("step", 0) not in [1, 2]:
+				return {"handled": true, "message": "The switch mechanism is not connected."}
+			if is_open(dungeon, gate):
+				return {"handled": true, "message": "The puzzle is already solved. The gate stays open."}
+			var gate_key = state_key(dungeon, gate)
+			var primed = bool(dungeon.interaction_states.get(gate_key, {}).get("primed", false))
+			var expected = 2 if primed else 1
+			if int(object["step"]) != expected:
+				dungeon.interaction_states[gate_key] = {"primed": false}
+				return {"handled": true, "message": "Wrong order. The switches reset. Try Sun before Moon."}
+			if expected == 1:
+				dungeon.interaction_states[gate_key] = {"primed": true}
+				return {"handled": true, "message": "The Sun switch clicks. One more switch remains."}
+			dungeon.interaction_states[gate_key] = {"open": true, "primed": false}
+			return {"handled": true, "message": "The Moon switch clicks. Puzzle solved! The sorting gate opens permanently."}
+		"puzzle_door":
+			return {"handled": true, "message": describe(dungeon, keys)}
 		"trap":
 			return {"handled": true, "message": describe(dungeon, keys)}
 		"key":
@@ -145,6 +171,6 @@ static func valid_states(states: Variant) -> bool:
 		if not key is String or key.is_empty() or not state is Dictionary or state.is_empty():
 			return false
 		for flag in state:
-			if flag not in ["open", "collected", "used", "triggered", "disarmed"] or not state[flag] is bool:
+			if flag not in ["open", "collected", "used", "triggered", "disarmed", "primed"] or not state[flag] is bool:
 				return false
 	return true

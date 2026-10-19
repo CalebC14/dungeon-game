@@ -4449,12 +4449,14 @@ func draw_map():
 				if object["type"] == "key":
 					color = Color("#d9b44a")
 					label = "K"
+				elif object["type"] == "puzzle_switch":
+					label = "P"
 				elif object["type"] == "trap":
 					label = "T"
 					color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
 				elif DungeonInteractions.is_barrier(object):
 					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
-					label = "D" if object["type"] in ["locked_door", "secret_door"] else "S"
+					label = "D" if object["type"] in ["locked_door", "secret_door", "puzzle_door"] else "S"
 				draw_rect(rect, color)
 				draw_string(ThemeDB.fallback_font, rect.position + Vector2(3, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
 
@@ -5075,7 +5077,11 @@ func draw_dungeon_interaction():
 		draw_circle(Vector2(440, 275), 9, Color("#d9b44a"))
 		return
 	var object = DungeonInteractions.target(dungeon)
-	if object.get("type", "") == "trap":
+	if object.get("type", "") == "puzzle_switch":
+		draw_rect(Rect2(345, 200, 90, 100), Color("#37424b"))
+		draw_circle(Vector2(390, 250), 24, Color("#d9b44a") if int(object.get("step", 1)) == 1 else Color("#a4b8d8"))
+		draw_string(ThemeDB.fallback_font, Vector2(360, 330), str(object.get("name", "Switch")))
+	elif object.get("type", "") == "trap":
 		var color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
 		draw_rect(Rect2(310, 350, 160, 35), color, false, 3)
 		for x in range(325, 470, 30):
