@@ -22,6 +22,8 @@ func run_checks():
 	for i in range(30):
 		var member = CharacterFactory.make_blank_character()
 		member["name"] = "Member %d" % i
+		member["hp"] = 10
+		member["max_hp"] = 10
 		game.party_system.register_character(member)
 	game.game_state = game.GameState.PARTY_SELECT
 	key(game, KEY_ENTER)

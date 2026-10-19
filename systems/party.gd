@@ -14,6 +14,7 @@ func register_character(character: Dictionary) -> bool:
 		character["character_id"] = id
 	if not find_character(id).is_empty():
 		return false
+	CharacterHealth.ensure(character)
 	collect_legacy_inventory(character)
 	roster.append(character)
 	return true
@@ -37,7 +38,12 @@ func active_members() -> Array:
 	return result
 
 func can_adventure() -> bool:
-	return active_members().size() >= 1 and active_members().size() <= 6
+	if active_members().is_empty() or active_members().size() > 6:
+		return false
+	for character in active_members():
+		if CharacterHealth.conscious(character):
+			return true
+	return false
 
 # The controller supplies its current Guild context; all membership changes
 # pass through these methods, including development fixtures.
@@ -93,6 +99,20 @@ func restore(data: Dictionary) -> bool:
 	for character in data["roster"]:
 		if not character is Dictionary or not character.get("character_id") is String:
 			return false
+		if character.has("dead") and not character["dead"] is bool:
+			return false
+		for field in ["hp", "max_hp", "death_rounds_remaining", "incapacitation_generation"]:
+			if character.has(field):
+				var value = character[field]
+				if (not value is int and not value is float) or value < 0 or value != int(value):
+					return false
+		if int(character.get("death_rounds_remaining", 3)) > 3:
+			return false
+		if not character.get("effects", []) is Array:
+			return false
+		for effect in character.get("effects", []):
+			if not effect is Dictionary:
+				return false
 		var id: String = character["character_id"]
 		if id.is_empty() or ids.has(id):
 			return false
@@ -121,5 +141,6 @@ func restore(data: Dictionary) -> bool:
 	slots = incoming.duplicate()
 	inventory = shared.duplicate()
 	for character in roster:
+		CharacterHealth.ensure(character)
 		collect_legacy_inventory(character)
 	return true

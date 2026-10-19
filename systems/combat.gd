@@ -376,7 +376,7 @@ func position_of(actor: Dictionary) -> int:
 	return int(actor.get("formation_slot", 0))
 
 func can_act(actor: Dictionary) -> bool:
-	if int(actor.get("hp", 0)) <= 0:
+	if not CharacterHealth.conscious(actor):
 		return false
 	for condition in ["stun", "paralysis", "petrify"]:
 		if effects.has_control(actor, condition):
@@ -455,7 +455,7 @@ func get_living_party(
 
 	for member in party:
 
-		if member["hp"] > 0:
+		if CharacterHealth.conscious(member):
 
 			living.append(
 				member
@@ -470,7 +470,7 @@ func party_defeated(
 
 	for member in party:
 
-		if member["hp"] > 0:
+		if CharacterHealth.conscious(member):
 			return false
 
 	return true
@@ -510,6 +510,8 @@ func resolve_round(
 	party: Array
 ) -> void:
 
+	var down_at_start = CharacterHealth.countdown_snapshot(party)
+	var completed = not party_defeated(party) and not all_enemies_defeated()
 	add_log("")
 
 	add_log(
@@ -551,10 +553,8 @@ func resolve_round(
 
 	for turn in turn_order:
 
-		if all_enemies_defeated():
-			break
-
-		if party_defeated(party):
+		if all_enemies_defeated() or party_defeated(party):
+			completed = false
 			break
 
 		if turn["type"] == "party":
@@ -571,12 +571,29 @@ func resolve_round(
 				party
 			)
 
-	for combatant in party + enemies:
-		effects.tick(combatant)
-	party_actions.clear()
+	finish_round(party, down_at_start, completed)
 
+
+func finish_round(party: Array, down_at_start: Array, completed: bool):
+	if completed:
+		for combatant in party + enemies:
+			effects.tick(combatant)
+		for character in CharacterHealth.complete_round(down_at_start):
+			add_log(str(character.get("name", "Character")) + " dies. Resurrection is required.")
+	party_actions.clear()
 	round_number += 1
 
+func resolve_failed_escape(party: Array):
+	var down_at_start = CharacterHealth.countdown_snapshot(party)
+	var completed = not party_defeated(party) and not all_enemies_defeated()
+	party_actions.clear()
+	for enemy in get_living_enemies():
+		if party_defeated(party) or all_enemies_defeated():
+			completed = false
+			break
+		resolve_enemy_action(enemy, party)
+	finish_round(party, down_at_start, completed)
+	cleanup_round(party)
 
 # ============================================================
 # PARTY ACTIONS
@@ -1275,10 +1292,7 @@ func life_drain(
 		)
 	)
 
-	actor["hp"] = min(
-		actor["max_hp"],
-		actor["hp"] + healing
-	)
+	healing = CharacterHealth.heal(actor, healing)
 
 	add_log(
 		actor["name"]
@@ -1332,17 +1346,7 @@ func heal_character(
 	verb: String
 ) -> void:
 
-	var old_hp = target["hp"]
-
-	target["hp"] = min(
-		target["max_hp"],
-		target["hp"] + amount
-	)
-
-	var actual_healing = (
-		target["hp"]
-		- old_hp
-	)
+	var actual_healing = CharacterHealth.heal(target, amount)
 
 	add_log(
 		actor["name"]
@@ -1366,7 +1370,7 @@ func get_most_injured_party_member(
 
 	for member in party:
 
-		if member["hp"] <= 0:
+		if bool(member.get("dead", false)):
 			continue
 
 		var missing = (
@@ -1384,7 +1388,7 @@ func get_most_injured_party_member(
 
 		for member in party:
 
-			if member["hp"] > 0:
+			if CharacterHealth.conscious(member):
 				return member
 
 	return result
@@ -1478,7 +1482,7 @@ func resolve_enemy_action(
 			damage = maxi(1, int(ceil(float(damage) * 0.70)))
 			# Extra threat is applied to the attacker only, not all enemies.
 			add_threat(enemy, target, float(damage), 1.5)
-	target["hp"] -= damage
+	CharacterHealth.damage(target, damage)
 	paladin_thorns_retribution(target, enemy, damage)
 	if savage_intercept and int(target.get("hp", 0)) > 0:
 		berserker_savage_counterattack(target, enemy)

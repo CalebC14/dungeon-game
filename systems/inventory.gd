@@ -118,10 +118,11 @@ func use_consumable(character: Dictionary, inventory_index: int, in_combat: bool
 		"heal":
 			if character["hp"] >= character["max_hp"]:
 				return str(character["name"]) + " is already at full health."
-			var old_hp = character["hp"]
-			character["hp"] = min(character["max_hp"], character["hp"] + item["power"])
+			var healed = CharacterHealth.heal(character, int(item["power"]))
+			if healed <= 0:
+				return "No healing was needed."
 			bag.remove_at(inventory_index)
-			return str(character["name"]) + " recovers " + str(character["hp"] - old_hp) + " HP."
+			return str(character["name"]) + " recovers " + str(healed) + " HP."
 		"cure_poison":
 			var remaining: Array = []
 			var cured = false

@@ -8,12 +8,15 @@ func apply(target: Dictionary, effect: Dictionary) -> bool:
 			return false
 	var active: Array = target.get("effects", [])
 	var incoming = effect.duplicate(true)
-	incoming["duration"] = maxi(1, int(incoming.get("duration", 1)))
+	incoming["persistent"] = bool(incoming.get("persistent", str(incoming.get("id", "")) in ["poison", "curse", "disease", "paralysis", "petrify"]))
+	var duration = int(incoming.get("duration", -1 if incoming["persistent"] else 1))
+	incoming["duration"] = -1 if duration < 0 and incoming["persistent"] else maxi(1, duration)
 	incoming["stacks"] = maxi(1, int(incoming.get("stacks", 1)))
 	for existing in active:
 		if str(existing.get("id", "")) == str(incoming.get("id", "")) and str(existing.get("source_key", "")) == str(incoming.get("source_key", "")):
 			existing["stacks"] = mini(int(incoming.get("max_stacks", existing.get("max_stacks", 1))), int(existing.get("stacks", 1)) + int(incoming["stacks"]))
-			existing["duration"] = maxi(int(existing.get("duration", 1)), int(incoming["duration"]))
+			existing["persistent"] = incoming["persistent"]
+			existing["duration"] = -1 if int(existing.get("duration", 1)) == -1 or int(incoming["duration"]) == -1 else maxi(int(existing.get("duration", 1)), int(incoming["duration"]))
 			target["effects"] = active
 			return true
 	active.append(incoming)
@@ -23,6 +26,9 @@ func apply(target: Dictionary, effect: Dictionary) -> bool:
 func tick(target: Dictionary) -> void:
 	var remaining: Array = []
 	for effect in target.get("effects", []):
+		if int(effect.get("duration", 1)) == -1:
+			remaining.append(effect)
+			continue
 		effect["duration"] = int(effect.get("duration", 1)) - 1
 		if int(effect["duration"]) > 0:
 			remaining.append(effect)
@@ -85,3 +91,13 @@ func set_cooldown(actor: Dictionary, ability_id: String, rounds: int) -> void:
 	var cooldowns: Dictionary = actor.get("cooldowns", {})
 	cooldowns[ability_id] = maxi(0, rounds)
 	actor["cooldowns"] = cooldowns
+
+func end_encounter(target: Dictionary):
+	var persistent: Array = []
+	for effect in target.get("effects", []):
+		if bool(effect.get("persistent", str(effect.get("id", "")) in ["poison", "curse", "disease", "paralysis", "petrify"])):
+			persistent.append(effect)
+	target["effects"] = persistent
+	target["cooldowns"] = {}
+	for field in ["combat_key", "passive_events"]:
+		target.erase(field)

@@ -26,10 +26,16 @@ enum GameState {
 	INVENTORY,
 	DUNGEON,
 	COMBAT,
-	COMBAT_RESULT
+	COMBAT_RESULT,
+	TEMPLE
 }
 
 var game_state = GameState.GUILD
+var save_path: String = "user://dungeon-save.dat"
+var save_message: String = ""
+var temple_character_index: int = 0
+var temple_message: String = ""
+
 
 
 # ============================================================
@@ -218,6 +224,8 @@ func bind_party_services():
 func _ready():
 
 	bind_party_services()
+	if not OS.get_environment("DUNGEON_SAVE_PATH").is_empty():
+		save_path = OS.get_environment("DUNGEON_SAVE_PATH")
 
 	randomize()
 
@@ -248,15 +256,22 @@ func reset_character_creator():
 # ============================================================
 
 func _input(event):
+	if event.is_pressed() and not event.is_echo() and event.keycode in [KEY_F5, KEY_F9] and game_state not in [GameState.COMBAT, GameState.COMBAT_RESULT]:
+		if event.keycode == KEY_F5:
+			save_game()
+		else:
+			load_game()
+		queue_redraw()
+		return
 
-	if not formation_menu_open and event.is_pressed() and not event.is_echo() and event.keycode == KEY_I and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN]:
+	if not formation_menu_open and event.is_pressed() and not event.is_echo() and event.keycode == KEY_I and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN, GameState.TEMPLE]:
 		open_inventory(game_state)
 		return
 
 	if formation_menu_open:
 		handle_formation_menu_input(event)
 		return
-	if event.is_pressed() and not event.is_echo() and event.keycode == KEY_F and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.INVENTORY, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN]:
+	if event.is_pressed() and not event.is_echo() and event.keycode == KEY_F and game_state in [GameState.GUILD, GameState.PARTY_SELECT, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON, GameState.INVENTORY, GameState.SHOP, GameState.TRAINING_HALL, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN, GameState.TEMPLE]:
 		open_formation_menu()
 		return
 
@@ -270,6 +285,8 @@ func _input(event):
 		return
 
 	match game_state:
+		GameState.TEMPLE:
+			handle_temple_input(event)
 
 		GameState.GUILD:
 			handle_guild_input(event)
@@ -440,8 +457,8 @@ func apply_developer_action(action: String):
 
 		"heal_party":
 			for member in party:
-				member["hp"] = member["max_hp"]
-			developer_menu.message = "Party fully healed."
+				CharacterHealth.heal(member, int(member["max_hp"]))
+			developer_menu.message = "Living party members healed."
 		"give_xp":
 			for member in party:
 				member["xp"] = int(member.get("xp", 0)) + 500
@@ -529,9 +546,10 @@ func handle_guild_input(event):
 
 		KEY_L:
 
-			if party.size() > 0:
+			if party_system.can_adventure():
 
 				game_state = GameState.CITY
+				save_game()
 
 				city.set_message(
 					"You leave the Adventurers' Guild."
@@ -559,6 +577,7 @@ func start_test_party():
 	load_test_roster()
 	city.reset()
 	game_state = GameState.CITY
+	save_game()
 	queue_redraw()
 
 
@@ -973,8 +992,9 @@ func handle_party_select_input(event):
 		KEY_ENTER:
 			if party_system.can_adventure():
 				game_state = GameState.CITY
+				save_game()
 			else:
-				party_message = "Choose at least one adventurer before leaving."
+				party_message = "Choose at least one conscious adventurer before leaving."
 		KEY_LEFT:
 			selected_formation_slot = (selected_formation_slot + 5) % 6
 		KEY_RIGHT:
@@ -1170,9 +1190,9 @@ func activate_city_location():
 			enter_wilderness()
 
 		"temple":
-			city.set_message(
-				location["name"] + " is not yet available."
-			)
+			temple_character_index = 0
+			temple_message = "Resurrection restores a dead adventurer to 1 HP."
+			game_state = GameState.TEMPLE
 
 	queue_redraw()
 
@@ -1691,6 +1711,9 @@ func handle_training_hall_input(event):
 
 
 func train_character(member: Dictionary):
+	if not CharacterHealth.conscious(member):
+		training_message = "Heal or resurrect this adventurer before training."
+		return
 	ensure_character_sp_fields(member)
 
 	var required_xp = get_xp_required_for_next_level(member["level"])
@@ -1732,7 +1755,7 @@ func complete_training_stat_choice(stat_choice: int):
 	member["max_hp"] += training_pending_hp_gain
 	member["max_sp"] += training_pending_sp_gain
 	member[stat_key] += 1
-	member["hp"] = member["max_hp"]
+	CharacterHealth.heal(member, int(member["max_hp"]))
 	member["sp"] = member["max_sp"]
 
 	training_message = (
@@ -1985,9 +2008,9 @@ func handle_current_dungeon_event() -> bool:
 
 	if event_type == "fountain":
 		for member in party:
-			if int(member.get("hp", 0)) > 0:
+			if not bool(member.get("dead", false)):
 				var hp_gain = max(1, int(ceil(float(member.get("max_hp", 1)) * 0.25)))
-				member["hp"] = min(int(member.get("max_hp", 1)), int(member.get("hp", 0)) + hp_gain)
+				CharacterHealth.heal(member, hp_gain)
 				if member.has("sp") and member.has("max_sp"):
 					var sp_gain = max(1, int(ceil(float(member["max_sp"]) * 0.25)))
 					member["sp"] = min(int(member["max_sp"]), int(member["sp"]) + sp_gain)
@@ -2313,7 +2336,7 @@ func resolve_combat_round():
 		party
 	)
 
-	if combat.all_enemies_defeated():
+	if combat.all_enemies_defeated() and not combat.party_defeated(party):
 
 		handle_combat_victory()
 
@@ -2325,7 +2348,7 @@ func resolve_combat_round():
 
 		combat_result_text = (
 			"THE PARTY HAS FALLEN.\n\n"
-			+ "Your adventure ends here."
+			+ "Game over. Reload the last save to continue."
 		)
 
 		last_combat_rewards = {}
@@ -2432,7 +2455,7 @@ func attempt_party_escape():
 
 		clear_all_combat_flags()
 
-		game_state = GameState.DUNGEON
+		game_state = GameState.WILDERNESS if current_combat_tag == "wilderness" else GameState.DUNGEON
 
 	else:
 
@@ -2440,14 +2463,7 @@ func attempt_party_escape():
 			"The party fails to escape!"
 		)
 
-		combat.clear_actions()
-
-		for enemy in combat.get_living_enemies():
-
-			combat.resolve_enemy_action(
-				enemy,
-				party
-			)
+		combat.resolve_failed_escape(party)
 
 		if combat.party_defeated(
 			party
@@ -2455,7 +2471,7 @@ func attempt_party_escape():
 
 			combat_result_text = (
 				"THE PARTY HAS FALLEN.\n\n"
-				+ "Your adventure ends here."
+				+ "Game over. Reload the last save to continue."
 			)
 
 			clear_all_combat_flags()
@@ -2467,8 +2483,6 @@ func attempt_party_escape():
 			combat.cleanup_round(
 				party
 			)
-
-			combat.round_number += 1
 
 			combat_character_index = 0
 
@@ -2482,33 +2496,19 @@ func attempt_party_escape():
 # ============================================================
 
 func handle_combat_result_input(event):
-
 	if not event.is_pressed() or event.is_echo():
 		return
-
-	if event.keycode != KEY_ENTER:
-		return
-
-	if combat.party_defeated(
-		party
-	):
-
-		for member in party:
-
-			member["hp"] = (
-				member["max_hp"]
-			)
-
-		game_state = GameState.GUILD
-
+	if combat.party_defeated(party):
+		if event.keycode == KEY_ENTER:
+			if not load_game():
+				combat_result_text = "GAME OVER. No valid save is available.\n\n[N] Start a new game."
+		elif event.keycode == KEY_N:
+			get_tree().reload_current_scene()
 	else:
-
-		if current_combat_tag == "wilderness":
-			game_state = GameState.WILDERNESS
-		else:
-			game_state = GameState.DUNGEON
-
-	current_combat_tag = ""
+		if event.keycode != KEY_ENTER:
+			return
+		game_state = GameState.WILDERNESS if current_combat_tag == "wilderness" else GameState.DUNGEON
+		current_combat_tag = ""
 	queue_redraw()
 
 
@@ -2523,6 +2523,7 @@ func clear_temporary_combat_flags(
 	member["defending"] = false
 	member["guarded"] = false
 	member["warded"] = false
+	combat.effects.end_encounter(member)
 
 
 func clear_all_combat_flags():
@@ -2545,6 +2546,8 @@ func _draw():
 		return
 
 	match game_state:
+		GameState.TEMPLE:
+			draw_temple()
 
 		GameState.GUILD:
 			draw_guild()
@@ -2625,6 +2628,8 @@ func _draw():
 			draw_party_panel()
 
 	draw_developer_indicator()
+	if game_state not in [GameState.COMBAT, GameState.COMBAT_RESULT]:
+		draw_string(ThemeDB.fallback_font, Vector2(60, 625), "[F5] Save  [F9] Load  " + save_message, HORIZONTAL_ALIGNMENT_LEFT, 1000)
 	if developer_menu_open:
 		draw_developer_menu()
 
@@ -3596,7 +3601,7 @@ func draw_character_details(member: Dictionary):
 	if bool(member.get("dead", false)):
 		conditions.append("Dead")
 	elif int(member.get("hp", 0)) <= 0:
-		conditions.append("Incapacitated")
+		conditions.append(CharacterHealth.status(member))
 	for effect in member.get("effects", []):
 		conditions.append(str(effect.get("id", "Effect")))
 	draw_string(ThemeDB.fallback_font, Vector2(80, 280), "Conditions: " + ("None" if conditions.is_empty() else ", ".join(conditions)), HORIZONTAL_ALIGNMENT_LEFT, 650)
@@ -4223,7 +4228,7 @@ func draw_party_panel():
 			60,
 			495
 		),
-		"PARTY [I: MANAGE] [F: FORMATION]     GOLD: "
+		("PARTY     GOLD: " if game_state in [GameState.COMBAT, GameState.COMBAT_RESULT] else "PARTY [I: MANAGE] [F: FORMATION]     GOLD: ")
 		+ str(
 			progression.get_party_gold()
 		)
@@ -4239,7 +4244,7 @@ func draw_party_panel():
 
 		if member["hp"] <= 0:
 
-			status = "  [DOWN]"
+			status = "  [DEAD]" if bool(member.get("dead", false)) else "  [DOWN: %d]" % int(member.get("death_rounds_remaining", 3))
 
 		var text = (
 			PartyScript.SLOT_NAMES[party_system.slots.find(member["character_id"])]
@@ -4629,7 +4634,7 @@ func draw_combat_result():
 			210,
 			400
 		),
-		"[ENTER] CONTINUE"
+		"[ENTER] RELOAD LAST SAVE   [N] NEW GAME" if combat.party_defeated(party) else "[ENTER] CONTINUE"
 	)
 
 
@@ -4681,3 +4686,138 @@ func draw_formation_menu():
 		draw_string(ThemeDB.fallback_font, Vector2(80, 185 + i * 40), text)
 	draw_string(ThemeDB.fallback_font, Vector2(60, 470), "Occupied positions swap. Reserve characters stay at the Guild.")
 	draw_string(ThemeDB.fallback_font, Vector2(60, 510), "[Esc] Back")
+
+
+func stable_save_state() -> int:
+	var state = inventory_return_state if game_state == GameState.INVENTORY else game_state
+	if state in [GameState.GUILD, GameState.PARTY_SELECT]:
+		return GameState.GUILD
+	if state in [GameState.CITY, GameState.SHOP, GameState.TOWN_HALL, GameState.WARDEN_KEEP, GameState.INN, GameState.TEMPLE]:
+		return GameState.CITY
+	if state in [GameState.WILDERNESS, GameState.DUNGEON]:
+		return state
+	return -1
+
+func capture_save() -> Dictionary:
+	var state = stable_save_state()
+	if state < 0 or (state != GameState.GUILD and combat.party_defeated(party)):
+		return {}
+	return {
+		"version": 1, "state": state, "party": party_system.to_data(),
+		"gold": progression.get_party_gold(), "quests": quest_system.quest_states.duplicate(true),
+		"quest_items": quest_items.duplicate(true),
+		"city": {"id": city.city_id, "position": city.player_pos, "facing": city.facing},
+		"wilderness": {"id": wilderness.wilderness_id, "position": wilderness.player_pos, "facing": wilderness.facing},
+		"dungeon": {"id": dungeon.dungeon_id, "position": dungeon.player_pos, "facing": dungeon.facing,
+			"defeated": dungeon.defeated_fixed_encounters.duplicate(true),
+			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
+			"expedition_events": dungeon.consumed_expedition_events.duplicate(true)}
+	}
+
+func save_game() -> bool:
+	var data = capture_save()
+	if data.is_empty():
+		save_message = "Save outside combat and unfinished training."
+		return false
+	var ok = SaveGame.write(save_path, data)
+	save_message = "Game saved." if ok else "Save failed; previous save retained."
+	return ok
+
+func load_game() -> bool:
+	if game_state == GameState.COMBAT:
+		return false
+	if not restore_save(SaveGame.read(save_path)):
+		save_message = "No valid save found; current game retained."
+		return false
+	save_message = "Game loaded."
+	return true
+
+func valid_saved_location(data: Dictionary, system) -> bool:
+	if not data.get("position") is Vector2i or not data.get("facing") is int or data["facing"] < 0 or data["facing"] >= 4:
+		return false
+	if system is WildernessSystem:
+		return not system.is_blocked(data["position"])
+	return system.can_move_to(data["position"])
+
+func restore_save(data: Dictionary) -> bool:
+	# Stage every system before replacing live state; a bad save is atomic.
+	if data.get("version") != 1 or data.get("state") not in [GameState.GUILD, GameState.CITY, GameState.WILDERNESS, GameState.DUNGEON]:
+		return false
+	for field in ["party", "quests", "quest_items", "city", "wilderness", "dungeon"]:
+		if not data.get(field) is Dictionary:
+			return false
+	if not data.get("gold") is int or data["gold"] < 0:
+		return false
+	var restored_party = PartyScript.new()
+	if not restored_party.restore(data["party"]):
+		return false
+	if data["state"] != GameState.GUILD and combat.party_defeated(restored_party.active_members()):
+		return false
+	var restored_city = CitySystem.new()
+	var restored_wilderness = WildernessSystem.new()
+	var restored_dungeon = DungeonSystem.new()
+	if not restored_city.load_city(str(data["city"].get("id", ""))) or not restored_wilderness.load_wilderness(str(data["wilderness"].get("id", ""))) or not restored_dungeon.load_dungeon(str(data["dungeon"].get("id", ""))):
+		return false
+	for entry in [[data["city"], restored_city], [data["wilderness"], restored_wilderness], [data["dungeon"], restored_dungeon]]:
+		if not valid_saved_location(entry[0], entry[1]):
+			return false
+		entry[1].player_pos = entry[0]["position"]
+		entry[1].facing = entry[0]["facing"]
+	for field in ["defeated", "permanent_events", "expedition_events"]:
+		if not data["dungeon"].get(field) is Dictionary:
+			return false
+	restored_dungeon.defeated_fixed_encounters = data["dungeon"]["defeated"].duplicate(true)
+	restored_dungeon.consumed_permanent_events = data["dungeon"]["permanent_events"].duplicate(true)
+	restored_dungeon.consumed_expedition_events = data["dungeon"]["expedition_events"].duplicate(true)
+	party_system = restored_party
+	city = restored_city
+	wilderness = restored_wilderness
+	dungeon = restored_dungeon
+	progression = ProgressionSystem.new()
+	progression.add_gold(data["gold"])
+	quest_system = QuestSystem.new()
+	quest_system.quest_states = data["quests"].duplicate(true)
+	quest_items = data["quest_items"].duplicate(true)
+	combat = CombatSystem.new()
+	bind_party_services()
+	clear_all_combat_flags()
+	game_state = data["state"]
+	combat_character_index = 0
+	current_combat_tag = ""
+	last_combat_rewards = {}
+	combat_result_text = ""
+	combat_skills_open = false
+	combat_target_open = false
+	formation_menu_open = false
+	developer_menu_open = false
+	inventory_character_index = 0
+	roster_page = 0
+	training_pending_member = {}
+	queue_redraw()
+	return true
+
+func handle_temple_input(event):
+	if not event.is_pressed() or event.is_echo():
+		return
+	if event.keycode == KEY_ESCAPE:
+		game_state = GameState.CITY
+	elif event.keycode in [KEY_LEFT, KEY_RIGHT] and not party.is_empty():
+		temple_character_index = (temple_character_index + party.size() + (-1 if event.keycode == KEY_LEFT else 1)) % party.size()
+	elif event.keycode == KEY_ENTER and not party.is_empty():
+		temple_character_index = clampi(temple_character_index, 0, party.size() - 1)
+		var member = party[temple_character_index]
+		if CharacterHealth.resurrect(member):
+			temple_message = str(member["name"]) + " returns to life with 1 HP. Other conditions remain."
+		else:
+			temple_message = "Only the dead require resurrection. Use ordinary healing for incapacitation."
+	queue_redraw()
+
+func draw_temple():
+	draw_header("TEMPLE — RESURRECTION")
+	if not party.is_empty():
+		temple_character_index = clampi(temple_character_index, 0, party.size() - 1)
+		var member = party[temple_character_index]
+		draw_string(ThemeDB.fallback_font, Vector2(60, 150), str(member["name"]) + " — " + CharacterHealth.status(member))
+	draw_string(ThemeDB.fallback_font, Vector2(60, 225), "Resurrection restores 1 HP. Service is free.")
+	draw_string(ThemeDB.fallback_font, Vector2(60, 285), temple_message, HORIZONTAL_ALIGNMENT_LEFT, 1000)
+	draw_string(ThemeDB.fallback_font, Vector2(60, 400), "[Left/Right] Character   [Enter] Resurrect   [Esc] City")
