@@ -22,6 +22,7 @@ var consumed_expedition_events: Dictionary = {}
 var player_pos: Vector2i = Vector2i.ZERO
 var facing: int = 0
 var message: String = ""
+var lantern_on: bool = false
 
 const DIRECTIONS = [Vector2i(0,-1), Vector2i(1,0), Vector2i(0,1), Vector2i(-1,0)]
 const DIRECTION_NAMES = ["NORTH", "EAST", "SOUTH", "WEST"]
@@ -205,3 +206,12 @@ func get_skill_target() -> Dictionary:
 		target["success_message"] = "The floor trap is safe."
 		return target
 	return get_exploration_object()
+
+func is_dark() -> bool:
+	return player_pos in dungeon_data.get("dark_tiles", [])
+
+func visibility_limited() -> bool:
+	return is_dark() and not lantern_on
+
+func map_tile_visible(position: Vector2i) -> bool:
+	return not visibility_limited() or (absi(position.x - player_pos.x) <= 1 and absi(position.y - player_pos.y) <= 1)

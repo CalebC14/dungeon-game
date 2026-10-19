@@ -8,6 +8,7 @@ const DATA = {
 		"#.#...#.....#.#","#.###.#####.#.#","#.....#.....#.#","#####.#.#####.#","#.....#.......#",
 		"#.###########.#","#.............#","#.###########.#","#.............#","###############"
 	],
+	"dark_tiles":[Vector2i(8,11),Vector2i(9,11),Vector2i(10,11),Vector2i(11,11),Vector2i(12,11),Vector2i(9,12)],
 	"start_position":Vector2i(1,13),"start_facing":0,
 	"fixed_encounters":{Vector2i(13,1):{"id":"warehouse_rat_boss","tag":"warehouse_rat_boss","enemy_id":"rat_broodmother","count":1,"intro":"An enormous rat rises from a nest of splintered crates and gnawed refuse!"}},
 	"transitions":{},

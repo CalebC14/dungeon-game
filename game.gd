@@ -1909,6 +1909,11 @@ func leave_dungeon(target_city_id: String = ""):
 # ============================================================
 
 func handle_dungeon_input(event):
+	if event.is_pressed() and not event.is_echo() and event.keycode == KEY_L:
+		dungeon.lantern_on = not dungeon.lantern_on
+		dungeon.message = "Lantern lit. Visibility restored." if dungeon.lantern_on else "Lantern extinguished. Dark areas limit visibility."
+		queue_redraw()
+		return
 
 	if (
 		event.is_pressed()
@@ -2666,7 +2671,12 @@ func _draw():
 		GameState.DUNGEON:
 
 			draw_dungeon_view()
-			draw_dungeon_interaction()
+			if dungeon.visibility_limited():
+				draw_rect(Rect2(40,40,700,400), Color("#08080d"))
+				draw_rect(Rect2(40,40,700,400), Color("#555566"), false, 2)
+				draw_string(ThemeDB.fallback_font, Vector2(220,240), "Too dark to see ahead. [L] Light lantern.")
+			else:
+				draw_dungeon_interaction()
 			draw_status()
 			draw_map()
 			draw_party_panel()
@@ -4369,7 +4379,7 @@ func draw_status():
 		"POSITION: "
 		+ str(
 			dungeon.player_pos
-		)
+		) + ("  [L] Light: ON" if dungeon.lantern_on else "  [L] Light: OFF")
 	)
 
 	draw_string(
@@ -4431,6 +4441,9 @@ func draw_map():
 				x,
 				y
 			)
+			if not dungeon.map_tile_visible(map_pos):
+				draw_rect(rect, Color("#08080d"))
+				continue
 
 			if (
 				map_pos
@@ -4793,7 +4806,7 @@ func capture_save() -> Dictionary:
 			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
 			"expedition_events": dungeon.consumed_expedition_events.duplicate(true),
 			"rogue_attempts": dungeon.rogue_attempts.duplicate(true),
-			"interaction_states": dungeon.interaction_states.duplicate(true)}
+			"interaction_states": dungeon.interaction_states.duplicate(true), "lantern_on": dungeon.lantern_on}
 	}
 
 func save_game() -> bool:
@@ -4843,6 +4856,9 @@ func restore_save(data: Dictionary) -> bool:
 	# Apply the barrier overlay before validating a saved position on an open door.
 	if not DungeonInteractions.valid_states(data["dungeon"].get("interaction_states", {})):
 		return false
+	if not data["dungeon"].get("lantern_on", false) is bool:
+		return false
+	restored_dungeon.lantern_on = data["dungeon"].get("lantern_on", false)
 	restored_dungeon.interaction_states = data["dungeon"].get("interaction_states", {}).duplicate(true)
 	for entry in [[data["city"], restored_city], [data["wilderness"], restored_wilderness], [data["dungeon"], restored_dungeon]]:
 		if not valid_saved_location(entry[0], entry[1]):
