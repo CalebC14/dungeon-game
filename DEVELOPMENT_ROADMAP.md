@@ -125,3 +125,23 @@ patrol warnings. Fixed encounters and traps remain active. Route tests confirm
 boss and test-object access without optional mechanisms. See
 WAREHOUSE_LAYOUT_PASS1.md. The baseline now has 38 passing suites. Broader
 dungeon pacing and Dungeon Architect integration remain pending.
+
+## Follow-through: dungeon layout validation first pass
+
+A read-only layout validator checks map structure, starts, content access, and
+transition landings with closed/open barrier floods. The 13 current dungeons
+have no errors and two isolated-floor warnings (Church: 21 tiles; Archives:
+5). No layouts were automatically repaired. See DUNGEON_LAYOUT_VALIDATION_PASS1.md.
+The baseline now has 39 passing suites. Dungeon Architect is the user's design
+tool; its version/export workflow must be identified before building an adapter.
+Mechanism dependency checks and full pacing analysis remain pending.
+
+## Follow-through: Dungeon Architect JSON preview adapter
+
+The supplied Broken Reliquary export confirms project schema 0.3.0 and floor
+schema 0.1.0. A first-pass adapter converts its five floors and stair links,
+validates them as a separate catalog, and preserves gameplay markers as inert
+annotations. All five preview floors pass; existing live dungeons are unchanged.
+See DUNGEON_ARCHITECT_IMPORT_PASS1.md. The baseline now has 40 passing suites.
+Enemy/reward bindings, boss gating, world registration, and save migration must
+be resolved before replacing playable content.
