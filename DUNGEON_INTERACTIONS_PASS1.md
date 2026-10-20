@@ -18,8 +18,9 @@ north and move two tiles to `(1,11)`, then move east one tile to `(2,11)`.
 4. Move north onto `(7,9)` and face west. The **Warehouse cross-passage** at
    `(6,9)` is now open. Walk west through it into the other storage corridor.
 
-Normal exploration encounters still apply while walking. The existing G exit
-shortcut and class skill test objects remain available.
+The southern testing aisles and door/lever area suppress random encounters.
+Deeper routes retain encounters. See WAREHOUSE_LAYOUT_PASS1.md. The existing G
+exit shortcut and class skill test objects remain available.
 
 ## Rules and feedback
 

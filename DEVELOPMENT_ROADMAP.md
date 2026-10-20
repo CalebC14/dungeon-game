@@ -116,3 +116,12 @@ tile movement costs one step; other actions are free for testing. It introduces
 no fuel, condition ticks, extra encounter rolls, or exploration death countdown.
 See EXPLORATION_TIME_PASS1.md. The baseline now has 37 passing suites. Time
 units, broader action costs, and timed consequences remain design work.
+
+## Follow-through: Warehouse layout and pacing first pass
+
+A connector at (3,12) creates a small entrance loop. Data-defined quiet areas
+cover the southern test aisles and door/lever area, with one-time entrance and
+patrol warnings. Fixed encounters and traps remain active. Route tests confirm
+boss and test-object access without optional mechanisms. See
+WAREHOUSE_LAYOUT_PASS1.md. The baseline now has 38 passing suites. Broader
+dungeon pacing and Dungeon Architect integration remain pending.

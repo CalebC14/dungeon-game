@@ -6,8 +6,13 @@ const DATA = {
 	"map":[
 		"###############","#.............#","#.#####.#####.#","#.#...#.#...#.#","#.#...#.#...#.#",
 		"#.#...#.....#.#","#.###.#####.#.#","#.....#.....#.#","#####.#.#####.#","#.....#.......#",
-		"#.###########.#","#.............#","#.###########.#","#.............#","###############"
+		"#.###########.#","#.............#","#.#.#########.#","#.............#","###############"
 	],
+	"quiet_areas":[Rect2i(1,11,13,3),Rect2i(6,9,2,2)],
+	"events": {
+		Vector2i(1,12): {"id":"warehouse_loading_notice", "type":"lore", "message":"Loading aisles: no random battles. Explore east for tests; look north for keys and hidden routes."},
+		Vector2i(13,10): {"id":"warehouse_rat_warning", "type":"lore", "message":"Rat tracks lead north. Beyond the loading aisles, wandering rats patrol toward the northeast nest."}
+	},
 	"tracks_exploration_time":true,
 	"dark_tiles":[Vector2i(8,11),Vector2i(9,11),Vector2i(10,11),Vector2i(11,11),Vector2i(12,11),Vector2i(9,12)],
 	"start_position":Vector2i(1,13),"start_facing":0,

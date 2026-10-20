@@ -2094,6 +2094,8 @@ func add_item_to_shared_inventory(item_id: String) -> bool:
 
 
 func check_for_encounter():
+	if dungeon.is_quiet_area():
+		return
 
 	if randf() < encounter_chance:
 		start_combat()

@@ -218,3 +218,9 @@ func visibility_limited() -> bool:
 
 func map_tile_visible(position: Vector2i) -> bool:
 	return not visibility_limited() or (absi(position.x - player_pos.x) <= 1 and absi(position.y - player_pos.y) <= 1)
+
+func is_quiet_area() -> bool:
+	for area in dungeon_data.get("quiet_areas", []):
+		if area.has_point(player_pos):
+			return true
+	return false
