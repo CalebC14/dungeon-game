@@ -2680,6 +2680,8 @@ func _draw():
 				draw_string(ThemeDB.fallback_font, Vector2(220,240), "Too dark to see ahead. [L] Light lantern.")
 			else:
 				draw_dungeon_interaction()
+			if bool(dungeon.dungeon_data.get("tracks_exploration_time", false)):
+				draw_string(ThemeDB.fallback_font, Vector2(60,425), "EXPLORATION: %d steps (1 per tile moved)" % dungeon.exploration_steps)
 			draw_status()
 			draw_map()
 			draw_party_panel()
@@ -4809,7 +4811,7 @@ func capture_save() -> Dictionary:
 			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
 			"expedition_events": dungeon.consumed_expedition_events.duplicate(true),
 			"rogue_attempts": dungeon.rogue_attempts.duplicate(true),
-			"interaction_states": dungeon.interaction_states.duplicate(true), "lantern_on": dungeon.lantern_on}
+			"interaction_states": dungeon.interaction_states.duplicate(true), "lantern_on": dungeon.lantern_on, "exploration_steps": dungeon.exploration_steps}
 	}
 
 func save_game() -> bool:
@@ -4861,6 +4863,10 @@ func restore_save(data: Dictionary) -> bool:
 		return false
 	if not data["dungeon"].get("lantern_on", false) is bool:
 		return false
+	var saved_steps = data["dungeon"].get("exploration_steps", 0)
+	if not saved_steps is int or saved_steps < 0:
+		return false
+	restored_dungeon.exploration_steps = saved_steps
 	restored_dungeon.lantern_on = data["dungeon"].get("lantern_on", false)
 	restored_dungeon.interaction_states = data["dungeon"].get("interaction_states", {}).duplicate(true)
 	for entry in [[data["city"], restored_city], [data["wilderness"], restored_wilderness], [data["dungeon"], restored_dungeon]]:

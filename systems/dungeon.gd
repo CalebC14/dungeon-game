@@ -23,6 +23,7 @@ var player_pos: Vector2i = Vector2i.ZERO
 var facing: int = 0
 var message: String = ""
 var lantern_on: bool = false
+var exploration_steps: int = 0
 
 const DIRECTIONS = [Vector2i(0,-1), Vector2i(1,0), Vector2i(0,1), Vector2i(-1,0)]
 const DIRECTION_NAMES = ["NORTH", "EAST", "SOUTH", "WEST"]
@@ -65,6 +66,8 @@ func move_to(target: Vector2i) -> bool:
 		elif DungeonInteractions.is_barrier(object):
 			message = str(object.get("name", "Passage")) + " is closed. Face it and press Enter."
 		return false
+	if target != player_pos and bool(dungeon_data.get("tracks_exploration_time", false)):
+		exploration_steps += 1
 	player_pos = target
 	message = ""
 	return true

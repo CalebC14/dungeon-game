@@ -108,3 +108,11 @@ repeat XP/gold/loot payouts and rejects empty, unfinished, or mutual-defeat
 victories. See ENCOUNTER_REWARD_VALIDATION_PASS1.md. The baseline now has 36
 passing suites. Quest payout auditing, loot tables, reachability, and encounter
 pacing remain separate work; exploration-time design is still pending.
+
+## Follow-through: exploration clock first pass
+
+The Warehouse opts into a cumulative saved exploration-step counter. Successful
+tile movement costs one step; other actions are free for testing. It introduces
+no fuel, condition ticks, extra encounter rolls, or exploration death countdown.
+See EXPLORATION_TIME_PASS1.md. The baseline now has 37 passing suites. Time
+units, broader action costs, and timed consequences remain design work.
