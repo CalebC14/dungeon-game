@@ -2,6 +2,7 @@ class_name DungeonEncounterData
 extends RefCounted
 
 const TABLES = {
+	"architect_test_archives":[{"enemy_id":"skeleton","min_group":1,"max_group":2,"weight":1}],
 	"architect_test_church_nave":[{"enemy_id":"skeleton","min_group":1,"max_group":2,"weight":1}],
 	"abandoned_warehouse":[{"enemy_id":"giant_rat","min_group":1,"max_group":4,"weight":10}],
 	"wine_cellar":[{"enemy_id":"giant_rat","min_group":1,"max_group":4,"weight":6},{"enemy_id":"wino","min_group":1,"max_group":2,"weight":3},{"enemy_id":"bar_fly","min_group":2,"max_group":5,"weight":4},{"enemy_id":"drunken_slob","min_group":1,"max_group":3,"weight":3},{"enemy_id":"cellar_mold","min_group":1,"max_group":3,"weight":2}],

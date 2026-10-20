@@ -2444,6 +2444,9 @@ func handle_combat_victory():
 		return
 	combat.rewards_claimed = true
 
+	if current_combat_tag == "architect_archives_guardian":
+		dungeon.mark_current_fixed_encounter_defeated()
+
 	if current_combat_tag == "architect_nave_guardian":
 		dungeon.mark_current_fixed_encounter_defeated()
 
@@ -4491,7 +4494,7 @@ func draw_map():
 					color = Color("#d45d47") if DungeonInteractions.trap_active(dungeon, object) else Color("#438c88")
 				elif DungeonInteractions.is_barrier(object):
 					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
-					label = "D" if object["type"] in ["locked_door", "secret_door", "puzzle_door"] else "S"
+					label = "D" if object["type"] in ["door", "locked_door", "secret_door", "puzzle_door"] else "S"
 				draw_rect(rect, color)
 				draw_string(ThemeDB.fallback_font, rect.position + Vector2(2, mini(13, tile_size - 2)), label, HORIZONTAL_ALIGNMENT_LEFT, -1, mini(12, maxi(6, tile_size - 3)))
 

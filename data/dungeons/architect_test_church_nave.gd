@@ -8,7 +8,7 @@ const DATA = {
 	"fixed_encounters": {Vector2i(12,4): {"id":"nave_test_guardian", "tag":"architect_nave_guardian", "enemy_id":"skeleton", "count":1, "intro":"The Profaned Nave Guardian rises. A single Skeleton stands in for this test boss."}},
 	"transitions": {
 		Vector2i(12,16): {"to_city":true,"to_city_id":"thornwake","requires_interact":true,"hint":"[Enter] Leave the test Nave for Thornwake."},
-		Vector2i(12,2): {"to_city":true,"to_city_id":"thornwake","requires_interact":true,"requires_defeated":"nave_test_guardian","hint":"[Enter] Use trapdoor after defeating the guardian (test exit)."}
+		Vector2i(12,2): {"target_dungeon":"architect_test_archives","target_position":Vector2i(12,16),"target_facing":0,"requires_interact":true,"requires_defeated":"nave_test_guardian","hint":"[Enter] Descend to the Archives after defeating the guardian."}
 	},
 	"interactions": {
 		Vector2i(3,9): {"id":"nave_votive_cache","type":"hidden_treasure","name":"a votive coin cache","clue":"A cracked pew conceals a small compartment.","reward_gold":25},

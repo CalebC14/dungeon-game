@@ -27,7 +27,7 @@ no new dark area or resource cost is introduced.
 | (20,9) | One-time shrine lore. |
 | (20,3) | Search from an adjacent tile to open a concealed niche, then walk onto it for inscription lore. |
 | (12,4) | Profaned Nave Guardian: a single existing Skeleton as an intentionally simple stand-in. |
-| (12,2) | Enter to use the trapdoor after defeating the guardian. For this pass it returns to town as the completion exit. |
+| (12,2) | Enter to descend to the playable imported Archives after defeating the guardian. |
 
 The guardian is not a new balanced boss. Its normal Skeleton XP/gold/loot use
 the existing reward system and duplicate-victory guard. Defeat persists under
@@ -35,15 +35,15 @@ a test-only encounter ID. No Purge quest state is changed. Guardian defeat,
 cache collection, trap/niche state, lore, and the current position save normally.
 
 The trapdoor checks `requires_defeated` before travel, so walking around the
-guardian cannot unlock it. Escape leaves it sealed. It does not lead into the
-imported Archives yet; that floor still lacks playable bindings. This prevents
-exposure of incomplete floors while keeping the first imported floor testable.
+guardian cannot unlock it. Escape leaves it sealed. It now leads to the playable imported Archives. The Archives return stair
+leads back here; the Nave entrance remains the exit to town. See
+PLAYABLE_ARCHIVES_PASS1.md for the connected walkthrough.
 
 ## Presentation and scope
 
 The dungeon map now scales to fit its side panel, including small labels.
 The Warehouse retains its original 18-pixel tile size. Transition hints show
-the entrance and completion-exit controls when no newer message is present.
+the entrance and stair controls when no newer message is present.
 The developer menu lists the new N shortcut.
 
 This pass does not replace existing dungeon IDs or save locations, register
@@ -56,6 +56,6 @@ these bindings after regenerating the preview.
 All 41 test suites and headless startup pass. The added integration test uses
 the developer shortcut, immediate exit, imported geometry, reachable guardian,
 pre-victory exit gate, treasure, trap damage, niche/lore, guardian victory,
-unchanged quest state, save/load, completion exit, and re-entry. Encounter and
+unchanged quest state, save/load, guardian-gated descent, and re-entry. Encounter and
 layout validators accept the live binding. Native Godot views of the entry,
 map, and developer menu were checked.

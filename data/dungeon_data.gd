@@ -17,7 +17,10 @@ const BrokenReliquaryChapel = preload("res://data/dungeons/broken_reliquary_chap
 
 const ArchitectTestNave = preload("res://data/dungeons/architect_test_church_nave.gd")
 
+const ArchitectTestArchives = preload("res://data/dungeons/architect_test_archives.gd")
+
 const DUNGEONS = {
+	"architect_test_archives": ArchitectTestArchives.DATA,
 	"architect_test_church_nave": ArchitectTestNave.DATA,
 	"abandoned_warehouse": AbandonedWarehouse.DATA,
 	"wine_cellar": WineCellar.DATA,

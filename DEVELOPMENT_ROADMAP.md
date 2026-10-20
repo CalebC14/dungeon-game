@@ -154,3 +154,12 @@ entrance return, and a guardian-gated completion exit to town. The imported
 Archives and existing Reliquary remain unchanged. See PLAYABLE_CHURCH_NAVE_PASS1.md.
 The baseline now has 41 passing suites. Balanced boss design, progression
 hooks, and playable bindings for subsequent floors remain pending.
+
+## Follow-through: playable connected imported Archives
+
+The imported Archives now has a separate playable binding linked both ways to
+the guardian-gated Nave trapdoor. Six keyless doors, two coin caches, lore, a
+Skeleton guardian, and an unfinished-stairs notice provide first-pass content.
+The Nave entrance still exits to town; later preview floors remain unavailable.
+See PLAYABLE_ARCHIVES_PASS1.md. All 42 test suites pass. Original Reliquary
+content and quests are unchanged.

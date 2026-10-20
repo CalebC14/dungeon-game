@@ -6,7 +6,7 @@ static func state_key(dungeon, object: Dictionary) -> String:
 	return dungeon.dungeon_id + ":" + str(object.get("id", ""))
 
 static func is_barrier(object: Dictionary) -> bool:
-	return object.get("type", "") in ["locked_door", "shortcut", "secret_door", "puzzle_door"]
+	return object.get("type", "") in ["door", "locked_door", "shortcut", "secret_door", "puzzle_door"]
 
 static func is_open(dungeon, object: Dictionary) -> bool:
 	return bool(dungeon.interaction_states.get(state_key(dungeon, object), {}).get("open", false))
@@ -74,6 +74,8 @@ static func describe(dungeon, keys: Dictionary) -> String:
 			return name_text + (". [R] Disarm Trap, or walk around it." if trap_active(dungeon, object) else " is safe (disarmed or spent).")
 		"key":
 			return name_text + ". [Enter] Take key."
+		"door":
+			return name_text + (" is open." if is_open(dungeon, object) else ". [Enter] Open door.")
 		"locked_door":
 			if is_open(dungeon, object):
 				return name_text + " is open."
@@ -135,6 +137,11 @@ static func interact(dungeon, keys: Dictionary, in_combat: bool = false) -> Dict
 			keys[str(object["key_id"])] = true
 			dungeon.interaction_states[key] = {"collected": true}
 			return {"handled": true, "message": "Picked up " + name_text + ". The key is reusable."}
+		"door":
+			if is_open(dungeon, object):
+				return {"handled": true, "message": name_text + " is already open."}
+			dungeon.interaction_states[key] = {"open": true}
+			return {"handled": true, "message": "Opened " + name_text + "."}
 		"locked_door":
 			if is_open(dungeon, object):
 				return {"handled": true, "message": name_text + " is already open."}
