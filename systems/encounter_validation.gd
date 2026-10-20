@@ -43,6 +43,11 @@ static func reward_errors(enemies: Dictionary) -> Array[String]:
 
 static func dungeon_errors(id: String, data: Dictionary, enemies: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
+	var multiplier = data.get("random_encounter_multiplier", 1.0)
+	if not (multiplier is int or multiplier is float) or not is_finite(float(multiplier)) or multiplier < 0 or multiplier > 1:
+		errors.append(id + ": random encounter multiplier must be between 0 and 1")
+	if not nonnegative(data.get("encounter_grace_steps", 0)):
+		errors.append(id + ": encounter grace must be a nonnegative integer")
 	var ids: Array[String] = []
 	for position in data.get("fixed_encounters", {}):
 		var entry = data["fixed_encounters"][position]

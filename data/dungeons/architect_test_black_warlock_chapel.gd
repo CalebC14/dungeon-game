@@ -4,7 +4,7 @@ const Preview = preload("res://import_previews/broken_reliquary/architect_broken
 const DATA = {
 	"id":"architect_test_black_warlock_chapel", "name":"Chapel (Test)", "town":"thornwake", "zone":"ashenwood",
 	"map":Preview.DATA["map"], "start_position":Vector2i(12,16), "start_facing":0,
-	"tracks_exploration_time":true, "quiet_areas":[Rect2i(0,13,25,6)],
+	"tracks_exploration_time":true, "random_encounter_multiplier":0.5, "encounter_grace_steps":4, "quiet_areas":[Rect2i(0,13,25,6)],
 	"fixed_encounters": {Vector2i(12,5): {"id":"chapel_test_boss","tag":"architect_chapel_boss","enemy_id":"black_acolyte","count":1,"intro":"Bristle-Aptarj's test encounter begins. A single Black Acolyte stands in for the final boss."}},
 	"transitions": {
 		Vector2i(12,16): {"target_dungeon":"architect_test_catacombs_lower","target_position":Vector2i(22,2),"target_facing":2,"requires_interact":true,"hint":"[Enter] Return to the Lower Catacombs."},

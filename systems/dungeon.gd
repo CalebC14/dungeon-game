@@ -24,6 +24,8 @@ var facing: int = 0
 var message: String = ""
 var lantern_on: bool = false
 var exploration_steps: int = 0
+var encounter_grace_remaining: int = 0
+var encounter_grace_on_step: bool = false
 
 const DIRECTIONS = [Vector2i(0,-1), Vector2i(1,0), Vector2i(0,1), Vector2i(-1,0)]
 const DIRECTION_NAMES = ["NORTH", "EAST", "SOUTH", "WEST"]
@@ -40,6 +42,7 @@ func load_dungeon(new_dungeon_id: String) -> bool:
 	fixed_encounters = dungeon_data.get("fixed_encounters", {})
 	transitions = dungeon_data.get("transitions", {})
 	events = dungeon_data.get("events", {})
+	reset_encounter_grace()
 	message = ""
 	reset()
 	return true
@@ -49,6 +52,7 @@ func reset() -> void:
 	facing = dungeon_data.get("start_facing", 0)
 
 func begin_expedition() -> void:
+	reset_encounter_grace()
 	consumed_expedition_events.clear()
 	message = ""
 
@@ -66,6 +70,9 @@ func move_to(target: Vector2i) -> bool:
 		elif DungeonInteractions.is_barrier(object):
 			message = str(object.get("name", "Passage")) + " is closed. Face it and press Enter."
 		return false
+	if target != player_pos:
+		encounter_grace_on_step = encounter_grace_remaining > 0
+		encounter_grace_remaining = maxi(0, encounter_grace_remaining - 1)
 	if target != player_pos and bool(dungeon_data.get("tracks_exploration_time", false)):
 		exploration_steps += 1
 	player_pos = target
@@ -229,3 +236,10 @@ func is_quiet_area() -> bool:
 		if area.has_point(player_pos):
 			return true
 	return false
+
+func reset_encounter_grace() -> void:
+	encounter_grace_remaining = maxi(0, int(dungeon_data.get("encounter_grace_steps", 0)))
+	encounter_grace_on_step = encounter_grace_remaining > 0
+
+func random_encounters_protected() -> bool:
+	return encounter_grace_remaining > 0 or encounter_grace_on_step

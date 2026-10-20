@@ -199,3 +199,12 @@ six caches, performs disk save/load midway, and uses the Chapel exit. Re-entry
 checks prevent cache farming. No gameplay/balance changes were needed. See
 IMPORTED_CHAIN_TEST_PASS1.md. All 46 test suites pass; manual random-encounter
 pacing and broader balance testing remain pending.
+
+## Follow-through: imported random encounter pacing first pass
+
+All five imported test floors use a 0.5 multiplier (12.5% with the current base)
+and four protected tile moves after floor entry or battle start. Quiet areas
+and fixed encounters retain priority. Protection survives saves and appears in
+the exploration footer. Other dungeons/wilderness retain their previous pacing.
+See IMPORTED_ENCOUNTER_PACING_PASS1.md. All 47 test suites pass; manual long-run
+balance and per-floor tuning remain pending.

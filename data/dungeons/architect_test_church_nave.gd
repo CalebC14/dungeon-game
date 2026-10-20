@@ -4,7 +4,7 @@ const Preview = preload("res://import_previews/broken_reliquary/architect_broken
 const DATA = {
 	"id":"architect_test_church_nave", "name":"Church Nave (Test)", "town":"thornwake", "zone":"ashenwood",
 	"map":Preview.DATA["map"], "start_position":Vector2i(12,16), "start_facing":0,
-	"tracks_exploration_time":true, "quiet_areas":[Rect2i(0,9,25,10)],
+	"tracks_exploration_time":true, "random_encounter_multiplier":0.5, "encounter_grace_steps":4, "quiet_areas":[Rect2i(0,9,25,10)],
 	"fixed_encounters": {Vector2i(12,4): {"id":"nave_test_guardian", "tag":"architect_nave_guardian", "enemy_id":"skeleton", "count":1, "intro":"The Profaned Nave Guardian rises. A single Skeleton stands in for this test boss."}},
 	"transitions": {
 		Vector2i(12,16): {"to_city":true,"to_city_id":"thornwake","requires_interact":true,"hint":"[Enter] Leave the test Nave for Thornwake."},

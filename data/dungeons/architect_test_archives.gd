@@ -4,7 +4,7 @@ const Preview = preload("res://import_previews/broken_reliquary/architect_broken
 const DATA = {
 	"id":"architect_test_archives", "name":"Archives (Test)", "town":"thornwake", "zone":"ashenwood",
 	"map":Preview.DATA["map"], "start_position":Vector2i(12,16), "start_facing":0,
-	"tracks_exploration_time":true, "quiet_areas":[Rect2i(0,12,25,7)],
+	"tracks_exploration_time":true, "random_encounter_multiplier":0.5, "encounter_grace_steps":4, "quiet_areas":[Rect2i(0,12,25,7)],
 	"fixed_encounters": {Vector2i(13,14): {"id":"archives_test_guardian", "tag":"architect_archives_guardian", "enemy_id":"skeleton", "count":1,"intro":"A restless archivist rises. A single Skeleton stands in for the Archives guardian."}},
 	"transitions": {
 		Vector2i(12,2): {"target_dungeon":"architect_test_catacombs_upper","target_position":Vector2i(12,16),"target_facing":0,"requires_interact":true,"hint":"[Enter] Descend to the Upper Catacombs."},

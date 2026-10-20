@@ -63,3 +63,10 @@ Godot --headless --path /Users/caleb/dungeon-game --script res://tests/test_impo
 Replace `Godot` with the installed executable. Failure to reach a route target,
 open a door, win a fixed battle within the action limit, restore state, or finish
 the journey causes the script to exit with an error.
+
+## Random pacing follow-up
+
+Imported floors now have a lower random-encounter rate and saved movement
+protection; see IMPORTED_ENCOUNTER_PACING_PASS1.md. This end-to-end test keeps
+random battles disabled to isolate connectivity and persistence. Its state
+checkpoint also covers the new pacing fields.

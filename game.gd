@@ -2104,14 +2104,16 @@ func add_item_to_shared_inventory(item_id: String) -> bool:
 
 
 func check_for_encounter():
-	if dungeon.is_quiet_area():
+	if dungeon.is_quiet_area() or dungeon.random_encounters_protected():
 		return
 
-	if randf() < encounter_chance:
+	var chance = clampf(encounter_chance * float(dungeon.dungeon_data.get("random_encounter_multiplier", 1.0)), 0.0, 1.0)
+	if randf() < chance:
 		start_combat()
 
 
 func start_combat():
+	dungeon.reset_encounter_grace()
 
 	current_combat_tag = ""
 
@@ -2148,6 +2150,7 @@ func roll_dungeon_encounter(table: Array) -> Dictionary:
 
 
 func start_fixed_encounter(encounter: Dictionary):
+	dungeon.reset_encounter_grace()
 
 	current_combat_tag = encounter.get("tag", "")
 
@@ -2702,7 +2705,10 @@ func _draw():
 			else:
 				draw_dungeon_interaction()
 			if bool(dungeon.dungeon_data.get("tracks_exploration_time", false)):
-				draw_string(ThemeDB.fallback_font, Vector2(60,425), "EXPLORATION: %d steps (1 per tile moved)" % dungeon.exploration_steps)
+				var clock_text = "EXPLORATION: %d steps (1 per tile moved)" % dungeon.exploration_steps
+				if int(dungeon.dungeon_data.get("encounter_grace_steps", 0)) > 0:
+					clock_text += " | %d safe moves left" % dungeon.encounter_grace_remaining
+				draw_string(ThemeDB.fallback_font, Vector2(60,425), clock_text)
 			draw_status()
 			draw_map()
 			draw_party_panel()
@@ -4834,7 +4840,8 @@ func capture_save() -> Dictionary:
 			"permanent_events": dungeon.consumed_permanent_events.duplicate(true),
 			"expedition_events": dungeon.consumed_expedition_events.duplicate(true),
 			"rogue_attempts": dungeon.rogue_attempts.duplicate(true),
-			"interaction_states": dungeon.interaction_states.duplicate(true), "lantern_on": dungeon.lantern_on, "exploration_steps": dungeon.exploration_steps}
+			"interaction_states": dungeon.interaction_states.duplicate(true), "lantern_on": dungeon.lantern_on, "exploration_steps": dungeon.exploration_steps,
+			"encounter_grace_remaining": dungeon.encounter_grace_remaining, "encounter_grace_on_step": dungeon.encounter_grace_on_step}
 	}
 
 func save_game() -> bool:
@@ -4889,6 +4896,12 @@ func restore_save(data: Dictionary) -> bool:
 	var saved_steps = data["dungeon"].get("exploration_steps", 0)
 	if not saved_steps is int or saved_steps < 0:
 		return false
+	var saved_grace = data["dungeon"].get("encounter_grace_remaining", restored_dungeon.encounter_grace_remaining)
+	var grace_on_step = data["dungeon"].get("encounter_grace_on_step", restored_dungeon.encounter_grace_on_step)
+	if not saved_grace is int or saved_grace < 0 or not grace_on_step is bool:
+		return false
+	restored_dungeon.encounter_grace_remaining = saved_grace
+	restored_dungeon.encounter_grace_on_step = grace_on_step
 	restored_dungeon.exploration_steps = saved_steps
 	restored_dungeon.lantern_on = data["dungeon"].get("lantern_on", false)
 	restored_dungeon.interaction_states = data["dungeon"].get("interaction_states", {}).duplicate(true)

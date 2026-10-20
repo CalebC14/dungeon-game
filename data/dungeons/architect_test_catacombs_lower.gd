@@ -4,7 +4,7 @@ const Preview = preload("res://import_previews/broken_reliquary/architect_broken
 const DATA = {
 	"id":"architect_test_catacombs_lower", "name":"Lower Catacombs", "town":"thornwake", "zone":"ashenwood",
 	"map":Preview.DATA["map"], "start_position":Vector2i(12,16), "start_facing":0,
-	"tracks_exploration_time":true, "quiet_areas":[Rect2i(0,13,25,6)], "fixed_encounters":{},
+	"tracks_exploration_time":true, "random_encounter_multiplier":0.5, "encounter_grace_steps":4, "quiet_areas":[Rect2i(0,13,25,6)], "fixed_encounters":{},
 	"transitions": {
 		Vector2i(22,2): {"target_dungeon":"architect_test_black_warlock_chapel","target_position":Vector2i(12,16),"target_facing":0,"requires_interact":true,"hint":"[Enter] Descend to the Chapel."},
 		Vector2i(12,16): {"target_dungeon":"architect_test_catacombs_upper","target_position":Vector2i(12,2),"target_facing":2,"requires_interact":true,"hint":"[Enter] Return to the Upper Catacombs."}},
