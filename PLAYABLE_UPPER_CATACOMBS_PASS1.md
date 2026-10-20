@@ -45,7 +45,8 @@ Caches cannot pay twice after reloading or returning.
 
 The Lower Catacombs now has a connected playable test binding. Enter at
 `(12,2)` descends to its `(12,16)` return stair, without a new boss gate.
-See PLAYABLE_LOWER_CATACOMBS_PASS1.md. The Chapel remains a preview. The test
+See PLAYABLE_LOWER_CATACOMBS_PASS1.md. The Chapel is also connected through the Lower Catacombs; see
+PLAYABLE_CHAPEL_PASS1.md. The test
 chain has no new world entrance, quest progression, or developer shortcut
 beyond the existing Nave entry.
 

@@ -181,3 +181,12 @@ arrival region provide simple test content. No new boss gate is added; the
 Chapel remains unavailable. The return chain reaches the Nave's town exit.
 See PLAYABLE_LOWER_CATACOMBS_PASS1.md. All 44 test suites pass; live Reliquary
 content and generated previews remain unchanged.
+
+## Follow-through: playable connected imported Chapel
+
+The Chapel completes the five-floor imported test chain with twelve keyless
+doors, two coin caches, a Black Acolyte stand-in boss, and a victory-revealed
+town exit. The Lower Catacombs link is bidirectional and the full stair return
+chain remains available. Test completion does not alter live Reliquary quests.
+See PLAYABLE_CHAPEL_PASS1.md. All 45 test suites pass. Generated previews and
+original campaign content remain unchanged; boss design and balance are pending.

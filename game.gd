@@ -2444,6 +2444,9 @@ func handle_combat_victory():
 		return
 	combat.rewards_claimed = true
 
+	if current_combat_tag == "architect_chapel_boss":
+		dungeon.mark_current_fixed_encounter_defeated()
+
 	if current_combat_tag == "architect_archives_guardian":
 		dungeon.mark_current_fixed_encounter_defeated()
 

@@ -69,7 +69,9 @@ func run_checks():
 	d.player_pos = Vector2i(22,2)
 	game.check_dungeon_tile()
 	key(game,KEY_ENTER)
-	check(d.dungeon_id == "architect_test_catacombs_lower" and "not playable" in d.message and d.get_current_transition().is_empty(), "Chapel remains closed")
+	check(d.dungeon_id == "architect_test_black_warlock_chapel", "Lower stairs reach playable Chapel")
+	key(game,KEY_ENTER)
+	check(d.dungeon_id == "architect_test_catacombs_lower" and d.player_pos == Vector2i(22,2), "Chapel return reaches matched Lower landing")
 	for id in ["architect_test_catacombs_upper","architect_test_archives","architect_test_church_nave"]:
 		d.player_pos = Vector2i(12,16)
 		key(game,KEY_ENTER)
@@ -96,7 +98,7 @@ func run_checks():
 		check(seen.has(position), "content accessible after opening approachable doors " + str(position))
 	check(EncounterValidation.all_errors().is_empty(), "encounter data validates")
 	check(DungeonLayoutValidation.inspect(layout.dungeon_id,layout.dungeon_data,DungeonData.DUNGEONS)["errors"].is_empty(), "Lower layout validates")
-	check(not DungeonData.DUNGEONS.has("architect_test_black_warlock_chapel"), "unfinished Chapel not registered")
+	check(not DungeonData.DUNGEONS.has("architect_broken_reliquary_black_warlock_chapel"), "generated Chapel preview remains unregistered")
 	game.queue_free()
 	if failures.is_empty():
 		print("PASS imported Lower Catacombs stairs, doors, cache, lore, saves, and return chain")

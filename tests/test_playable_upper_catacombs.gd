@@ -90,7 +90,7 @@ func run_checks():
 		check(seen.has(position), "content reachable after opening approachable doors " + str(position))
 	check(EncounterValidation.all_errors().is_empty(), "encounter data validates")
 	check(DungeonLayoutValidation.inspect(layout.dungeon_id,layout.dungeon_data,DungeonData.DUNGEONS)["errors"].is_empty(), "layout validates")
-	check(not DungeonData.DUNGEONS.has("architect_test_black_warlock_chapel"), "later preview is not registered")
+	check(not DungeonData.DUNGEONS.has("architect_broken_reliquary_black_warlock_chapel"), "generated Chapel preview remains unregistered")
 	game.queue_free()
 	if failures.is_empty():
 		print("PASS imported Upper Catacombs stairs, doors, cache, lore, saves, and return chain")

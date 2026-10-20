@@ -24,7 +24,7 @@ the Nave and its entrance exit to Thornwake.
 | (18,16) | Searchable ossuary coin pouch: 25 gold once. |
 | (2,2), (21,11) | One-time ossuary and procession lore. |
 | (12,15) | One-time testing/return-route notice. |
-| (22,2) | Unfinished Chapel notice; no transition onward. |
+| (22,2) | Enter descends to the playable imported Chapel. |
 
 Doors require no class, key, or roll. The cache can be searched from adjacent
 floor or underfoot. The southern region y=13–18 suppresses random encounters
@@ -38,18 +38,18 @@ Door state, cache collection, lore, floor/position, and exploration steps use
 existing saved state. Saving on an opened door works. Re-entry and loading do
 not duplicate treasure. States remain namespaced across the connected floors.
 
-The Chapel remains a preview and is not registered or exposed. Its stair
-marker displays the unfinished notice on first arrival. There is no new direct
-developer shortcut or quest progression. Test through the existing imported
-Nave route; the live Reliquary chain is unaffected.
+The Chapel now has a playable test binding connected at `(22,2)`, with its
+return stair at `(12,16)`. See PLAYABLE_CHAPEL_PASS1.md. There is no new direct
+developer shortcut or live quest progression. Test through the existing imported
+Nave route; the original Reliquary chain is unaffected.
 
 ## Validation
 
 All 44 test suites and headless startup pass. New integration coverage checks
 stair coordinates/facing, immediate return, no auto bounce, free floor travel,
 arrival movement/notice, keyless doors and save-on-door, repeat/saved treasure,
-lore, re-entry, Chapel closure, and the full return chain to town.
+lore, re-entry, Chapel descent/return, and the full return chain to town.
 An iterative door-access check proves that opening approachable doors reaches
-the cache, both lore markers, and unfinished Chapel stair. Encounter and layout
+the cache, both lore markers, and Chapel stair. Encounter and layout
 validation report no errors. Native Godot views of the arrival and door were
 checked for presentation.

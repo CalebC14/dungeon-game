@@ -150,7 +150,12 @@ func has_fixed_encounter(pos: Vector2i) -> bool:
 	return not defeated_fixed_encounters.get(dungeon_id + ":" + encounter_id, false)
 
 func get_current_transition() -> Dictionary:
-	return transitions.get(player_pos, {})
+	var transition: Dictionary = transitions.get(player_pos, {})
+	if bool(transition.get("hide_until_defeated", false)):
+		var required = str(transition.get("requires_defeated", ""))
+		if required.is_empty() or not is_fixed_encounter_defeated(dungeon_id, required):
+			return {}
+	return transition
 
 func has_transition(pos: Vector2i) -> bool:
 	return transitions.has(pos)

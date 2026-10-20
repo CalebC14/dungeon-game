@@ -88,5 +88,6 @@ binding adds explicit first-pass content without modifying or registering the
 generated preview itself. The Archives also has a connected playable test binding; see
 PLAYABLE_ARCHIVES_PASS1.md. The Upper Catacombs also has a connected test binding; see
 PLAYABLE_UPPER_CATACOMBS_PASS1.md. The Lower Catacombs also has a connected test binding; see
-PLAYABLE_LOWER_CATACOMBS_PASS1.md. The Chapel remains a preview.
+PLAYABLE_LOWER_CATACOMBS_PASS1.md. The Chapel also has a connected test binding; see PLAYABLE_CHAPEL_PASS1.md.
+All five imported floors now have separate playable test bindings.
 See PLAYABLE_CHURCH_NAVE_PASS1.md for controls, test values, and limitations.
