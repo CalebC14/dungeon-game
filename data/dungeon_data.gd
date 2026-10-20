@@ -21,7 +21,10 @@ const ArchitectTestArchives = preload("res://data/dungeons/architect_test_archiv
 
 const ArchitectTestUpper = preload("res://data/dungeons/architect_test_catacombs_upper.gd")
 
+const ArchitectTestLower = preload("res://data/dungeons/architect_test_catacombs_lower.gd")
+
 const DUNGEONS = {
+	"architect_test_catacombs_lower": ArchitectTestLower.DATA,
 	"architect_test_catacombs_upper": ArchitectTestUpper.DATA,
 	"architect_test_archives": ArchitectTestArchives.DATA,
 	"architect_test_church_nave": ArchitectTestNave.DATA,

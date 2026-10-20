@@ -24,7 +24,7 @@ then use the Nave entrance `(12,16)` to exit to Thornwake.
 | (22,16) | Searchable burial coin pouch: 25 gold once. |
 | (3,1), (20,1) | One-time memorial and watcher's lore. |
 | (12,15) | One-time test/return-route notice. |
-| (12,2) | Unfinished Lower Catacombs notice; no transition onward. |
+| (12,2) | Enter descends to the playable Lower Catacombs. |
 
 Door opening requires no class, key, or skill roll. Search the cache from
 adjacent floor or underfoot. The southern region y=13–18 suppresses random
@@ -43,17 +43,18 @@ steps use existing saved state. Floor changes preserve state for all connected
 test floors. Saving while standing on an open crypt door works normally.
 Caches cannot pay twice after reloading or returning.
 
-The Lower Catacombs and Chapel remain previews and are not exposed through
-this floor. The unfinished stair gives a one-time notice. The imported test
-chain has no new world entrance, quest progression, or independent developer
-shortcut beyond the existing Nave entry.
+The Lower Catacombs now has a connected playable test binding. Enter at
+`(12,2)` descends to its `(12,16)` return stair, without a new boss gate.
+See PLAYABLE_LOWER_CATACOMBS_PASS1.md. The Chapel remains a preview. The test
+chain has no new world entrance, quest progression, or developer shortcut
+beyond the existing Nave entry.
 
 ## Validation
 
 All 43 test suites and headless startup pass. New integration checks verify
 both stair directions and facing, no automatic bounce, arrival movement and
 notice, preserved clock, doors and save-on-door, one-time/saved treasure, lore,
-closed later floors, and the entire return chain to town. An iterative access
+Lower Catacombs descent/return, and the entire return chain to town. An iterative access
 check proves the doors can be approached/opened to reach the cache, lore, and
-unfinished stair. Layout and encounter data validate without errors. Native
+northern stair. Layout and encounter data validate without errors. Native
 Godot views of the arrival and crypt door were checked.

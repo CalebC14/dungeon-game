@@ -172,3 +172,12 @@ arrival area. No new boss gate is added; Lower Catacombs stairs remain inactive.
 The return chain reaches the Nave's town exit. See
 PLAYABLE_UPPER_CATACOMBS_PASS1.md. All 43 test suites pass; original Reliquary
 content and generated previews remain unchanged.
+
+## Follow-through: playable connected imported Lower Catacombs
+
+The Lower Catacombs now connects both ways to the Upper Catacombs. Six keyless
+doors, one coin cache, two lore markers, small Skeleton encounters, and a calm
+arrival region provide simple test content. No new boss gate is added; the
+Chapel remains unavailable. The return chain reaches the Nave's town exit.
+See PLAYABLE_LOWER_CATACOMBS_PASS1.md. All 44 test suites pass; live Reliquary
+content and generated previews remain unchanged.
