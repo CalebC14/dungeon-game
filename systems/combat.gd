@@ -10,6 +10,7 @@ var enemies: Array = []
 var combat_log: Array[String] = []
 
 var round_number: int = 1
+var rewards_claimed: bool = false
 
 var party_actions: Array = []
 
@@ -57,6 +58,7 @@ func start_encounter() -> void:
 	combat_log.clear()
 	party_actions.clear()
 
+	rewards_claimed = false
 	round_number = 1
 	song_of_courage_active = false
 
@@ -77,6 +79,7 @@ func start_specific_encounter(
 	combat_log.clear()
 	party_actions.clear()
 
+	rewards_claimed = false
 	round_number = 1
 	song_of_courage_active = false
 
@@ -92,6 +95,7 @@ func start_mixed_encounter(groups: Array, intro_override: String = "") -> void:
 	enemies.clear()
 	combat_log.clear()
 	party_actions.clear()
+	rewards_claimed = false
 	round_number = 1
 	song_of_courage_active = false
 	for group in groups:

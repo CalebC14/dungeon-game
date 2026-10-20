@@ -2428,6 +2428,9 @@ func resolve_combat_round():
 # ============================================================
 
 func handle_combat_victory():
+	if combat.rewards_claimed or combat.enemies.is_empty() or not combat.all_enemies_defeated() or combat.party_defeated(party):
+		return
+	combat.rewards_claimed = true
 
 	if current_combat_tag == "warehouse_rat_boss":
 		dungeon.mark_current_fixed_encounter_defeated()

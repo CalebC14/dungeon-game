@@ -98,3 +98,13 @@ Broodmother, retain threat targeting. See ENEMY_BEHAVIOR_PASS1.md. This
 supersedes the proposal for an initial rat profile above. Broader enemy action
 AI and balance remain pending. The regression baseline now has 34 passing
 suites. Next recommended work: encounter-data and reward lifecycle validation.
+
+## Follow-through: encounter and reward validation
+
+The first developer validator checks current dungeon/wilderness/legacy encounter
+tables, fixed encounters, enemy rewards, and dungeon treasure references and
+gold fields. Current data passes. An encounter-local victory guard prevents
+repeat XP/gold/loot payouts and rejects empty, unfinished, or mutual-defeat
+victories. See ENCOUNTER_REWARD_VALIDATION_PASS1.md. The baseline now has 36
+passing suites. Quest payout auditing, loot tables, reachability, and encounter
+pacing remain separate work; exploration-time design is still pending.
