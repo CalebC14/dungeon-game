@@ -208,3 +208,13 @@ and fixed encounters retain priority. Protection survives saves and appears in
 the exploration footer. Other dungeons/wilderness retain their previous pacing.
 See IMPORTED_ENCOUNTER_PACING_PASS1.md. All 47 test suites pass; manual long-run
 balance and per-floor tuning remain pending.
+
+## Follow-through: full chain with random encounters enabled
+
+A seeded end-to-end journey now runs at the normal imported-floor pacing,
+completing eleven random and three fixed battles over 246 walked tiles, with
+ordinary combat, six caches, disk checkpoint restoration, and the final exit.
+All 48 suites pass. The test party finishes at full HP/SP: basic Arcane Bolt
+and Mend currently do not deduct SP, so this is not an endurance balance result.
+See IMPORTED_CHAIN_RANDOM_TEST_PASS1.md. Ability resource-cost auditing is the
+next useful balance prerequisite; broader seed/party playtesting remains pending.

@@ -65,3 +65,10 @@ behavior. Native Godot rendering checks the footer readout.
 The full-chain smoke test still disables random encounters intentionally;
 manual patrol frequency, party resources, and prolonged balance playtesting
 remain pending. No claim of final difficulty balance is made by these tests.
+
+## Full-chain test with patrols
+
+The normal-rate seeded journey now completes all five floors with eleven random
+battles and three fixed fights; see IMPORTED_CHAIN_RANDOM_TEST_PASS1.md. This
+adds integration coverage for patrols without replacing manual balance testing.
+Basic spell resource costs still need an audit before drawing endurance conclusions.

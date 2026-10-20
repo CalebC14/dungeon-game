@@ -26,9 +26,9 @@ func win_battle(game) -> bool:
 		game.queue_current_action(action)
 		actions += 1
 	if game.game_state != game.GameState.COMBAT_RESULT or game.combat.party_defeated(game.party):
-		check(false,"default test party failed fixed battle or exceeded action limit")
+		check(false,"default test party failed battle or exceeded action limit")
 		return false
-	check(game.combat.rewards_claimed,"fixed battle paid a legitimate victory")
+	check(game.combat.rewards_claimed,"battle paid a legitimate victory")
 	battles += 1
 	key(game,KEY_ENTER)
 	return game.game_state == game.GameState.DUNGEON
@@ -121,10 +121,10 @@ func journey(game) -> bool:
 	check(game.game_state == game.GameState.CITY and game.city.city_id == "thornwake","full journey exits to Thornwake")
 	return game.game_state == game.GameState.CITY
 func run_checks():
-	seed(123456)
 	var game = Game.new()
 	root.add_child(game)
 	game.load_test_roster()
+	seed(123456) # Game._ready randomizes; seed only after startup and party setup.
 	game.encounter_chance = 0.0
 	game.save_path = "/private/tmp/imported-chain-%d.dat" % OS.get_process_id()
 	var quests = game.quest_system.quest_states.duplicate(true)

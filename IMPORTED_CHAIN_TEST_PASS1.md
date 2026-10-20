@@ -70,3 +70,11 @@ Imported floors now have a lower random-encounter rate and saved movement
 protection; see IMPORTED_ENCOUNTER_PACING_PASS1.md. This end-to-end test keeps
 random battles disabled to isolate connectivity and persistence. Its state
 checkpoint also covers the new pacing fields.
+
+## Random-enabled companion
+
+The random-disabled journey remains as a focused integration baseline.
+`tests/test_imported_chain_random.gd` now reuses its route with normal random
+encounters enabled and adds battle spacing, quiet-area, and party-resource
+reporting. See IMPORTED_CHAIN_RANDOM_TEST_PASS1.md for seeded results and
+resource-cost limitations.
