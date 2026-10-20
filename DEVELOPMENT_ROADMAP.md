@@ -1,0 +1,80 @@
+# Dungeon Game — development roadmap
+
+Code audit: October 19, 2026. Current baseline: d795e7b. This records observed
+implementation and proposed next work; proposals do not lock new design rules.
+
+## Six workstreams
+
+| Area | Current implementation | Remaining work |
+| --- | --- | --- |
+| 1. Party Mechanics | 1–6 active members, Guild reserves and roster swapping, persistent six-slot formation, combat repositioning, shared bag and individual equipment, incapacitation and resurrection | Confirm remaining hybrid-inventory requirements; balance and broader playtesting. Combat consumable access is not implemented by the current out-of-combat inventory UI. |
+| 2. Combat Foundations | Queued party actions; Dexterity order; attacks, defense, class abilities, positioning, accuracy, armor, threat, taunts, effects and cooldowns | Define initiative ties, effect timing, shared magic/resistance policy, enemy behavior profiles, and combat item policy. Audit edge cases before balance changes. |
+| 3. Encounter Framework | Weighted per-dungeon/floor tables; fixed encounters; mixed groups; encounter intros; persistent defeated encounters | Validate data and reachability; audit scripted encounter lifecycle, escape/retry behavior, and encounter pacing. |
+| 4. Exploration & Interactions | Warehouse key/door/lever/shortcut, real lockpicking, floor trap/disarm, secret door, hidden gold, Sun/Moon puzzle, darkness/lantern; class skill menus and test objects | Exploration time; additional interaction types; actual spell/song design; class-skill integration beyond test objects; move prototypes into intentional dungeon layouts. |
+| 5. Persistence & Rewards | Staged save restoration, safe variant decoding, temporary-file writes, persistent interactions/boss flags, party gold, combat XP and quest progression | Audit all victory/escape/defeat paths and reward-once behavior; decide XP eligibility and split rules; balance economy and progression. |
+| 6. Dungeon Content & Tools | Hand-authored map/data files and a Warehouse test area | Define layout validation and pacing criteria; verify Dungeon Architect integration requirements. No integration was identified in the inspected gameplay files. |
+
+Warehouse mechanics are first-pass prototypes, not completed content or balance.
+Unlimited free lantern light and the guaranteed search mechanics remain testing
+rules. No new design decisions are implied by this audit.
+
+## Combat audit findings
+
+Sources: systems/combat.gd, systems/combat_effects.gd, game.gd and combat tests.
+
+- Party actions are queued before resolution. Both sides resolve in descending
+  Dexterity order. The comparator has no explicit equal-Dexterity tie policy.
+- Physical hit chance uses a 65% baseline plus class attack-stat and weapon
+  accuracy, minus avoidance, clamped to 10–95%. Physical damage includes weapon
+  damage/stat bonuses, armor absorption, and critical hits. This is existing
+  behavior, not a newly approved balance formula.
+- Formation filters reachable targets before threat selection. Reachable forced
+  targets take priority; otherwise enemies select the highest threat. Equal
+  threat currently favors the first eligible member encountered.
+- Enemy action resolution currently performs a basic physical attack with shared
+  defensive processing. Enemy definitions contain tags and statistics, but the
+  inspected action path does not select distinct behavior profiles or spells.
+- Effects support duration, stacking, resistance, mitigation, redirection, and
+  cooldowns. Persistent conditions can survive encounter cleanup. Persistence
+  alone does not establish poison damage or other exploration-time behavior.
+- Effects and cooldowns tick at completed-round boundaries. The effect file's
+  comment that a fresh effect survives its first tick needs reconciliation with
+  the actual duration decrement. Decide intended timing before changing it.
+- Falling characters retain the locked three-complete-round death countdown.
+  Existing health tests cover this; exploration must continue to pause it.
+
+## Recommended implementation order
+
+1. **Combat audit follow-through.** Document explicit round and effect timing,
+   tie behavior, and action validation; add focused regression tests where the
+   agreed behavior lacks coverage. Preserve locked death/formation rules.
+2. **Enemy behavior first pass.** Add a data-selected profile with existing
+   threat behavior as the default. Proposed initial variation: opportunistic
+   rats. Define chance, eligible targets, and taunt precedence before coding.
+   Keep it limited to targeting; enemy spells and boss scripts can follow.
+3. **Encounter and reward audit.** Validate floor-table references, group counts,
+   weights, fixed encounter IDs, and completion paths. Check that repeated
+   interaction/re-entry cannot duplicate permanent rewards.
+4. **Exploration time design.** Decide which actions advance time before adding
+   fuel, condition ticks, or timed encounters. Do not advance the death countdown
+   outside combat. Keep the free lantern prototype until its replacement is set.
+5. **Warehouse content pass and tools.** Arrange a short playable route rather
+   than adding more isolated tests. Validate transitions, optional routes,
+   mechanism reachability and save locations, then connect generation tools.
+
+## Decisions to settle before dependent code
+
+- Equal initiative: stable side/order, randomized tie, or secondary stat?
+- Effects/cooldowns: does the application round count toward duration?
+- Enemy profiles: target selection only initially; when can they override threat,
+  and must every profile obey reachable taunts?
+- XP: current implementation splits integer XP among members above 0 HP. Confirm
+  incapacitated/dead eligibility and remainder handling before changing it.
+- Exploration time: movement, turning, searching, menus, failed attempts?
+- Dungeon Architect: intended tool/version, generated format, and editor workflow.
+
+## Validation
+
+All 32 existing test suites passed for this audit in an isolated copy.
+These tests establish regression coverage, not full balance or content approval.
+This roadmap does not modify gameplay.
