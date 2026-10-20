@@ -22,7 +22,8 @@ previous floors to the Nave entrance for its unconditional town exit.
 - A test boss at `(12,5)`: one existing Black Acolyte stands in for Bristle-Aptarj.
   It uses existing targeting/attack/reward rules, not a newly designed boss AI.
 - A victory-revealed town exit at `(12,2)`. After winning the test boss encounter,
-  Enter at that tile returns to Thornwake. Before victory it has no travel hint
+  Face north and press Enter at that tile to return to Thornwake. Facing an
+  adjacent cache prioritizes searching it instead. Before victory it has no travel hint
   or usable current transition. The raw transition path still enforces the gate.
 - One-time introduction at `(12,15)`. The southern y=13–18 area suppresses random
   encounters; other areas use small Skeleton groups. Fixed encounters stay active.

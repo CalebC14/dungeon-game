@@ -190,3 +190,12 @@ town exit. The Lower Catacombs link is bidirectional and the full stair return
 chain remains available. Test completion does not alter live Reliquary quests.
 See PLAYABLE_CHAPEL_PASS1.md. All 45 test suites pass. Generated previews and
 original campaign content remain unchanged; boss design and balance are pending.
+
+## Follow-through: complete imported-chain smoke test
+
+A deterministic end-to-end test now walks all five imported floors with the
+default party, opens doors through input, resolves three real battles, searches
+six caches, performs disk save/load midway, and uses the Chapel exit. Re-entry
+checks prevent cache farming. No gameplay/balance changes were needed. See
+IMPORTED_CHAIN_TEST_PASS1.md. All 46 test suites pass; manual random-encounter
+pacing and broader balance testing remain pending.
