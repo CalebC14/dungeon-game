@@ -163,3 +163,12 @@ Skeleton guardian, and an unfinished-stairs notice provide first-pass content.
 The Nave entrance still exits to town; later preview floors remain unavailable.
 See PLAYABLE_ARCHIVES_PASS1.md. All 42 test suites pass. Original Reliquary
 content and quests are unchanged.
+
+## Follow-through: playable connected imported Upper Catacombs
+
+The Upper Catacombs now connects both ways to the Archives, with three keyless
+doors, one coin cache, two lore markers, small Skeleton encounters, and a calm
+arrival area. No new boss gate is added; Lower Catacombs stairs remain inactive.
+The return chain reaches the Nave's town exit. See
+PLAYABLE_UPPER_CATACOMBS_PASS1.md. All 43 test suites pass; original Reliquary
+content and generated previews remain unchanged.

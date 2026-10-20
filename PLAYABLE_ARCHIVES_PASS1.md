@@ -35,7 +35,7 @@ Closed doors block movement; open doors use the existing passability overlay.
 | (2,2), (22,16) | Searchable caches, 25 gold each, once. |
 | (2,16) | One-time ritual ledger lore. |
 | (12,15) | One-time testing/return-route notice. |
-| (12,2) | Unfinished Upper Catacombs notice; no active transition onward. |
+| (12,2) | Enter descends to the playable imported Upper Catacombs. |
 
 The lower region y=12–18 has no random battles, while fixed encounters remain
 active. Northern areas use small Skeleton groups. Movement advances the shared
@@ -48,9 +48,10 @@ through saves and travel. Saves made standing on an opened door restore its
 passability before validating position. Both floors share party inventory,
 health, gold, and exploration time. Re-entry cannot repeat permanent rewards.
 
-The Upper Catacombs remains a preview. Reaching its stair marker displays the
-unfinished notice; pressing Enter does not travel. There is no separate direct
-Archives developer shortcut; test it through the connected Nave route.
+The Upper Catacombs now has a playable test binding. Enter at `(12,2)` descends
+to its `(12,16)` return stair. No additional boss gate is added in this pass.
+See PLAYABLE_UPPER_CATACOMBS_PASS1.md. There is no separate direct Archives
+developer shortcut; test it through the connected Nave route.
 
 ## Validation
 
@@ -58,11 +59,11 @@ All 42 test suites and headless startup pass. Integration coverage includes
 actual movement from arrival to the guardian, both stair directions, no auto
 bounce, the Nave gate, door opening/traversal and save-on-door, two one-time
 caches and saved collection, guardian persistence, unchanged quest state,
-unfinished stairs, and returning to town. An iterative door-access check proves
+Upper Catacombs link and return, and returning to town. An iterative door-access check proves
 that opening approachable doors reaches both caches and the upper stair marker.
 Native Godot views of the arrival and closed door were checked.
 
-The full layout report now covers 15 dungeons with zero errors and 12 warnings:
+At the end of the Archives pass, the layout report covered 15 dungeons with zero errors and 12 warnings:
 ten barrier-dependent content warnings across the test Nave/Archives, plus the
 two pre-existing disconnected-floor warnings. Door access is intentional and
 covered by integration tests; warnings have not been suppressed.

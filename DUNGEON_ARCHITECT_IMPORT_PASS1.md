@@ -86,5 +86,6 @@ The Church Nave preview now has a separate playable test binding at
 `architect_test_church_nave`. F12 → N enters it with an active party. This
 binding adds explicit first-pass content without modifying or registering the
 generated preview itself. The Archives also has a connected playable test binding; see
-PLAYABLE_ARCHIVES_PASS1.md. The Catacombs and Chapel remain previews.
+PLAYABLE_ARCHIVES_PASS1.md. The Upper Catacombs also has a connected test binding; see
+PLAYABLE_UPPER_CATACOMBS_PASS1.md. The Lower Catacombs and Chapel remain previews.
 See PLAYABLE_CHURCH_NAVE_PASS1.md for controls, test values, and limitations.

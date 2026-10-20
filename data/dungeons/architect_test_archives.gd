@@ -6,7 +6,9 @@ const DATA = {
 	"map":Preview.DATA["map"], "start_position":Vector2i(12,16), "start_facing":0,
 	"tracks_exploration_time":true, "quiet_areas":[Rect2i(0,12,25,7)],
 	"fixed_encounters": {Vector2i(13,14): {"id":"archives_test_guardian", "tag":"architect_archives_guardian", "enemy_id":"skeleton", "count":1,"intro":"A restless archivist rises. A single Skeleton stands in for the Archives guardian."}},
-	"transitions": {Vector2i(12,16): {"target_dungeon":"architect_test_church_nave","target_position":Vector2i(12,2),"target_facing":2,"requires_interact":true,"hint":"[Enter] Climb back to the Church Nave."}},
+	"transitions": {
+		Vector2i(12,2): {"target_dungeon":"architect_test_catacombs_upper","target_position":Vector2i(12,16),"target_facing":0,"requires_interact":true,"hint":"[Enter] Descend to the Upper Catacombs."},
+		Vector2i(12,16): {"target_dungeon":"architect_test_church_nave","target_position":Vector2i(12,2),"target_facing":2,"requires_interact":true,"hint":"[Enter] Climb back to the Church Nave."}},
 	"interactions": {
 		Vector2i(11,5): {"id":"archives_door_1","type":"door","name":"Archive door"},
 		Vector2i(4,7): {"id":"archives_door_2","type":"door","name":"West archive door"},
@@ -18,8 +20,8 @@ const DATA = {
 		Vector2i(22,16): {"id":"archives_cache_south","type":"hidden_treasure","name":"a forgotten donation pouch","clue":"Coins glint beneath a dusty reading desk.","reward_gold":25}
 	},
 	"events": {
-		Vector2i(12,15): {"id":"archives_test_notice","type":"lore","message":"Archives test: Enter opens doors. Return stairs are south; the upper floor is not connected yet."},
+		Vector2i(12,15): {"id":"archives_test_notice","type":"lore","message":"Archives test: Enter opens doors. Return stairs are south; Upper Catacombs stairs are north."},
 		Vector2i(2,16): {"id":"archives_ritual_lore","type":"lore","message":"A brittle ledger records Bristle-Aptarj's failed ritual. The dead rose, but the lower chambers remained sealed."},
-		Vector2i(12,2): {"id":"archives_unfinished_stairs","type":"lore","message":"The Upper Catacombs are not playable yet. Return south to the Nave and its town exit."}
+		Vector2i(12,2): {"id":"archives_upper_stairs_notice","type":"lore","message":"The stairs descend to the Upper Catacombs. Press Enter to continue; you can return by the same route."}
 	}
 }
