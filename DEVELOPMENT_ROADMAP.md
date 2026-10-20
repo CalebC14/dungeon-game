@@ -88,3 +88,13 @@ boundary timing. See COMBAT_FOUNDATIONS_PASS1.md. These supersede the open tie
 and effect-timing audit items above. Enemy profiles, shared magic policy,
 combat items, and the remaining workstreams are still pending. The expanded
 33-suite regression baseline passes.
+
+## Follow-through: enemy behavior first pass
+
+Giant Rats now use a data-selected opportunistic profile with a 30% test chance
+to choose a different reachable living member. Reachable taunts override it;
+formation/range rules remain enforced. Other enemies, including the Rat
+Broodmother, retain threat targeting. See ENEMY_BEHAVIOR_PASS1.md. This
+supersedes the proposal for an initial rat profile above. Broader enemy action
+AI and balance remain pending. The regression baseline now has 34 passing
+suites. Next recommended work: encounter-data and reward lifecycle validation.

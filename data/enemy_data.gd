@@ -2,7 +2,7 @@ class_name EnemyData
 extends RefCounted
 
 const ENEMIES = {
-	"giant_rat": {"id":"giant_rat","name":"Giant Rat","hp":7,"attack":3,"dex":13,"base_accuracy":0.58,"base_avoidance":0.10,"absorption":0,"damage_min":1,"damage_max":3,"xp":8,"gold_min":1,"gold_max":3,"tags":["beast"]},
+	"giant_rat": {"id":"giant_rat","name":"Giant Rat","behavior":"opportunistic","opportunism_chance":0.30,"hp":7,"attack":3,"dex":13,"base_accuracy":0.58,"base_avoidance":0.10,"absorption":0,"damage_min":1,"damage_max":3,"xp":8,"gold_min":1,"gold_max":3,"tags":["beast"]},
 	"rat_broodmother": {"id":"rat_broodmother","name":"Rat Broodmother","hp":42,"attack":7,"dex":12,"base_accuracy":0.68,"base_avoidance":0.08,"absorption":1,"damage_min":3,"damage_max":7,"xp":75,"gold_min":20,"gold_max":35,"tags":["beast","boss"]},
 	"kobold": {"id":"kobold","name":"Kobold","hp":8,"attack":3,"dex":12,"base_accuracy":0.60,"base_avoidance":0.08,"absorption":0,"damage_min":1,"damage_max":3,"xp":10,"gold_min":2,"gold_max":5,"tags":["humanoid"]},
 	"goblin": {"id":"goblin","name":"Goblin","hp":10,"attack":4,"dex":11,"base_accuracy":0.62,"base_avoidance":0.07,"absorption":1,"damage_min":1,"damage_max":4,"xp":12,"gold_min":3,"gold_max":7,"tags":["humanoid"]},

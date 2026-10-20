@@ -247,6 +247,8 @@ func create_enemy_from_data(
 
 		"tags": enemy_data["tags"].duplicate(),
 		"attack_range": enemy_data.get("attack_range", "melee"),
+		"behavior": enemy_data.get("behavior", "threat"),
+		"opportunism_chance": clampf(float(enemy_data.get("opportunism_chance", 0.30)), 0.0, 1.0),
 		"formation_slot": enemy_data.get("formation_slot", 0),
 		"threat": {},
 		"effects": []
@@ -1597,6 +1599,17 @@ func select_enemy_target(enemy: Dictionary, living_party: Array) -> Dictionary:
 		if score > highest:
 			highest = score
 			best = member
+	# Profiles can change preference, never reachability or a reachable taunt.
+	if enemy.get("behavior", "threat") == "opportunistic" and not best.is_empty():
+		var alternatives: Array = []
+		for member in living_party:
+			if not is_same(member, best):
+				alternatives.append(member)
+		var chance = clampf(float(enemy.get("opportunism_chance", 0.30)), 0.0, 1.0)
+		if not alternatives.is_empty() and chance > 0.0 and randf() < chance:
+			var target: Dictionary = alternatives[randi_range(0, alternatives.size() - 1)]
+			add_log(str(enemy.get("name", "Enemy")) + " darts toward " + str(target.get("name", "a different target")) + "!")
+			return target
 	return best
 
 func apply_combat_effect(target: Dictionary, effect: Dictionary) -> bool:
