@@ -145,3 +145,12 @@ annotations. All five preview floors pass; existing live dungeons are unchanged.
 See DUNGEON_ARCHITECT_IMPORT_PASS1.md. The baseline now has 40 passing suites.
 Enemy/reward bindings, boss gating, world registration, and save migration must
 be resolved before replacing playable content.
+
+## Follow-through: playable imported Church Nave
+
+A separate test binding now makes the imported Church Nave playable through
+F12 → N, using existing Skeletons, treasure/trap/secret/lore systems, safe
+entrance return, and a guardian-gated completion exit to town. The imported
+Archives and existing Reliquary remain unchanged. See PLAYABLE_CHURCH_NAVE_PASS1.md.
+The baseline now has 41 passing suites. Balanced boss design, progression
+hooks, and playable bindings for subsequent floors remain pending.

@@ -10,6 +10,7 @@ func get_action_for_key(keycode: int) -> String:
 		KEY_F6: return "travel_dreadmarch"
 		KEY_F7: return "travel_oldroot"
 		KEY_F8: return "travel_ironreach"
+		KEY_N: return "dungeon_architect_nave"
 		KEY_4: return "dungeon_warehouse"
 		KEY_5: return "dungeon_wine_cellar"
 		KEY_6: return "dungeon_sewers_upper"
@@ -51,7 +52,7 @@ func get_display_lines() -> Array:
 		"[4] Warehouse  [5] Wine Cellar  [6] Sewers Upper  [7] Sewers Lower",
 		"[8] Prison Barracks  [9] Prison Holding  [A] Torture  [B] Morgue",
 		"[F1] Reliquary Church     [F2] Archives     [F3] Upper Catacombs",
-		"[F4] Lower Catacombs       [F5] Underground Chapel",
+		"[F4] Lower Catacombs  [F5] Underground Chapel  [N] Imported Nave Test",
 		"",
 		"QUEST STATES",
 		"[C] Start Rats  [D] Complete Rats  [E] Start Vintage  [F] Complete Vintage",

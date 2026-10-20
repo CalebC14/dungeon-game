@@ -425,6 +425,11 @@ func apply_developer_action(action: String):
 			game_state = GameState.CITY
 			developer_menu_open = false
 
+		"dungeon_architect_nave":
+			if party_system.can_adventure():
+				dev_enter_dungeon("architect_test_church_nave")
+			else:
+				developer_menu.message = "Choose a conscious active party first. [T] loads the test party at the Guild."
 		"dungeon_warehouse":
 			dev_enter_dungeon("abandoned_warehouse")
 		"dungeon_wine_cellar":
@@ -2021,6 +2026,11 @@ func activate_dungeon_transition():
 
 
 func perform_dungeon_transition(transition: Dictionary):
+	var required = str(transition.get("requires_defeated", ""))
+	if not required.is_empty() and not dungeon.is_fixed_encounter_defeated(dungeon.dungeon_id, required):
+		dungeon.message = "The trapdoor is sealed. Defeat the guardian first."
+		queue_redraw()
+		return
 
 	if transition.get("to_wilderness", false):
 		clear_all_combat_flags()
@@ -2433,6 +2443,9 @@ func handle_combat_victory():
 	if combat.rewards_claimed or combat.enemies.is_empty() or not combat.all_enemies_defeated() or combat.party_defeated(party):
 		return
 	combat.rewards_claimed = true
+
+	if current_combat_tag == "architect_nave_guardian":
+		dungeon.mark_current_fixed_encounter_defeated()
 
 	if current_combat_tag == "warehouse_rat_boss":
 		dungeon.mark_current_fixed_encounter_defeated()
@@ -4396,6 +4409,8 @@ func draw_status():
 	)
 
 	var display_message = dungeon.message
+	if display_message.is_empty():
+		display_message = str(dungeon.get_current_transition().get("hint", ""))
 	var interaction_hint = DungeonInteractions.describe(dungeon, quest_items)
 	if not interaction_hint.is_empty():
 		display_message = interaction_hint + (" " + display_message if not display_message.is_empty() else "")
@@ -4420,7 +4435,7 @@ func draw_status():
 
 func draw_map():
 
-	var tile_size = 18
+	var tile_size = maxi(1, mini(18, mini(int(320.0 / maxi(1, dungeon.get_width())), int(400.0 / maxi(1, dungeon.get_height())))))
 
 	var origin = Vector2(
 		800,
@@ -4478,7 +4493,7 @@ func draw_map():
 					color = Color("#438c88") if DungeonInteractions.is_open(dungeon, object) else Color("#946440")
 					label = "D" if object["type"] in ["locked_door", "secret_door", "puzzle_door"] else "S"
 				draw_rect(rect, color)
-				draw_string(ThemeDB.fallback_font, rect.position + Vector2(3, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+				draw_string(ThemeDB.fallback_font, rect.position + Vector2(2, mini(13, tile_size - 2)), label, HORIZONTAL_ALIGNMENT_LEFT, -1, mini(12, maxi(6, tile_size - 3)))
 
 			elif dungeon.is_wall(
 				map_pos

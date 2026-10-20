@@ -15,7 +15,10 @@ const BrokenReliquaryCatacombsUpper = preload("res://data/dungeons/broken_reliqu
 const BrokenReliquaryCatacombsLower = preload("res://data/dungeons/broken_reliquary_catacombs_lower.gd")
 const BrokenReliquaryChapel = preload("res://data/dungeons/broken_reliquary_chapel.gd")
 
+const ArchitectTestNave = preload("res://data/dungeons/architect_test_church_nave.gd")
+
 const DUNGEONS = {
+	"architect_test_church_nave": ArchitectTestNave.DATA,
 	"abandoned_warehouse": AbandonedWarehouse.DATA,
 	"wine_cellar": WineCellar.DATA,
 	"thornwake_sewers_upper": ThornwakeSewersUpper.DATA,

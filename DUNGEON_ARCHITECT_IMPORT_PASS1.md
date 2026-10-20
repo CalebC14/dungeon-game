@@ -79,3 +79,11 @@ and that invalid input creates no output. Fixtures cover schema versions,
 JSON numbers, geometry, reciprocal links, preserved markers, malformed grids,
 unknown tiles, conflicting/orphan links and layout rejection. Source input and
 existing gameplay content remain unchanged.
+
+## Playable test binding
+
+The Church Nave preview now has a separate playable test binding at
+`architect_test_church_nave`. F12 → N enters it with an active party. This
+binding adds explicit first-pass content without modifying or registering the
+generated preview itself. The remaining imported floors are still previews.
+See PLAYABLE_CHURCH_NAVE_PASS1.md for controls, test values, and limitations.
