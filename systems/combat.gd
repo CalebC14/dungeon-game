@@ -491,8 +491,16 @@ func queue_action(
 	ability_id: String = "",
 	target: Dictionary = {},
 	target_slot: int = -1
-) -> void:
-
+) -> bool:
+	if not can_act(character):
+		return false
+	if formation != null:
+		var id = str(character.get("character_id", ""))
+		if not formation.slots.has(id) or not is_same(formation.find_character(id), character):
+			return false
+	for queued in party_actions:
+		if is_same(queued["actor"], character):
+			return false
 	party_actions.append({
 		"actor": character,
 		"action": action_name,
@@ -500,6 +508,7 @@ func queue_action(
 		"target": target,
 		"target_slot": target_slot
 	})
+	return true
 
 
 # ============================================================
@@ -531,6 +540,7 @@ func resolve_round(
 
 		turn_order.append({
 			"type": "party",
+			"sequence": turn_order.size(),
 			"dex": actor["dex"],
 			"data": action
 		})
@@ -542,13 +552,14 @@ func resolve_round(
 
 		turn_order.append({
 			"type": "enemy",
+			"sequence": turn_order.size(),
 			"dex": enemy["dex"],
 			"data": enemy
 		})
 
 	turn_order.sort_custom(
 		func(a, b):
-			return a["dex"] > b["dex"]
+			return a["sequence"] < b["sequence"] if a["dex"] == b["dex"] else a["dex"] > b["dex"]
 	)
 
 	for turn in turn_order:

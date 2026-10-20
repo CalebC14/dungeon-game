@@ -78,3 +78,13 @@ Sources: systems/combat.gd, systems/combat_effects.gd, game.gd and combat tests.
 All 32 existing test suites passed for this audit in an isolated copy.
 These tests establish regression coverage, not full balance or content approval.
 This roadmap does not modify gameplay.
+
+## Follow-through: combat timing and action submission
+
+The first combat follow-through establishes stable equal-Dexterity ordering
+(party selection order, then enemy encounter order), rejects duplicate and
+ineligible action submissions, and documents the existing effect/cooldown
+boundary timing. See COMBAT_FOUNDATIONS_PASS1.md. These supersede the open tie
+and effect-timing audit items above. Enemy profiles, shared magic policy,
+combat items, and the remaining workstreams are still pending. The expanded
+33-suite regression baseline passes.

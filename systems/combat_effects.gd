@@ -1,7 +1,8 @@
 extends RefCounted
 
 # Effects: {id, kind, value, duration, stacks?, max_stacks?, source_key?}.
-# Duration is measured in completed rounds. A fresh effect survives its first tick.
+# Duration counts completed-round boundaries, including the application round.
+# A duration of 1 expires at the next completed-round tick.
 func apply(target: Dictionary, effect: Dictionary) -> bool:
 	if effect.get("kind", "") == "control":
 		if randf() < resistance(target, str(effect.get("id", ""))):
