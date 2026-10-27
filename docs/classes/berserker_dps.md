@@ -1,0 +1,12 @@
+# Berserker Dps — Dungeon Game
+
+**Status:** Design decisions recorded from project conversations; not proof of Godot implementation. All unspecified details are TBD, not invented.
+
+## Locked milestones
+- **L9 Blood Frenzy (passive):** Each successful physical attack action grants 1 Fury stack, +5% physical damage per stack, max 5 (+25%). Duration 3 rounds, refreshed by successful hit. Misses grant none; multi-target action grants at most 1 if any hit. New stack affects subsequent attacks, not the attack that earned it. Fury clears after combat; no SP/cooldown.
+- **L10 Savage Strike (active):** Single-target physical melee 150% normal weapon damage, normal crit; on hit grants 2 Fury stacks instead of 1. 5 SP, 3-round cooldown; melee weapon required.
+- **L20 Bloodthirst (passive):** On killing an enemy with physical attack, immediately follow up with normal weapon attack against a *different* living enemy for 100% normal weapon damage, normal crit. Follow-up hit generates 1 Fury; killing blow generates normal Fury. Follow-up cannot trigger another Bloodthirst; no follow-up without another enemy. No SP/cooldown; melee weapon required.
+- **L30 Whirlwind (active):** All-enemy physical melee 75% normal weapon damage each, plus additional +5% damage per pre-existing Fury stack **on top of** Blood Frenzy's ordinary +5% per stack; independent crit. Generates 1 Fury if at least one hit after damage resolves. 10 SP, 4-round cooldown; melee weapon required.
+- **L40 Unstoppable Fury (passive):** At exactly 5 Fury stacks, +15 percentage points critical chance and +20% critical-hit damage; deactivates below 5. No SP/cooldown.
+- **L50 Rampage (active):** Three consecutive physical melee strikes at 75% normal weapon damage each (225% total), independent crit; each successful strike grants 1 Fury (up to 3); remaining strikes transfer to another living enemy if target dies. 15 SP, 6-round cooldown; melee weapon required. Bloodthirst follow-up may occur after Rampage resolves if kill and another enemy remain, but cannot chain.
+- **L60 Bloodbath (active):** Requires at least 3 Fury; all-enemy physical melee for 125% normal weapon damage each, +15% damage per Fury stack consumed and +5 percentage points crit per consumed stack; consume all Fury after attack calculations, independent crit per enemy. 25 SP, 8-round cooldown; melee weapon required. Pre-consumption Blood Frenzy and Unstoppable Fury bonuses apply as relevant; Bloodbath itself generates no Fury.

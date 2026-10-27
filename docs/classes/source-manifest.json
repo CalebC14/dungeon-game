@@ -1,0 +1,18 @@
+{
+  "source_package": "dungeon_game_class_compendium.zip",
+  "source_package_sha256": "3b8978c7d254eff1e135a201aec242be0aa733a5a8595943d32e11d1514fcdc5",
+  "package_files_sha256": {
+    "berserker_dps.md": "ae76860f8d34d4ae8b279df95a3a616d79ec58be58ec1c40e09f48fdabbb6e16",
+    "README.md": "e02e57a0307b73c6de2bf8faacd8da65ebdd80a3c4eb9767ab3f87bed04708db",
+    "druid_tank.md": "0603fd17e8c47f26324faafa2504ca73600be755da20f939a3bd761a64b520bf",
+    "warrior_tank.md": "a90c250e8a4530684956148b02ea14dae1a38341f680446d9f580c26399567ca",
+    "hunter_support.md": "730bbab227272daf0779695bf3b308927e3ddc304bf97483419007d03363ed65",
+    "warrior_dps.md": "d086a7b9aed8539dac3c740b1cfb39d2cfa472d104de47095c8b4eea20383439",
+    "hunter_dps.md": "fae6659628dc1a507869a31bf3e59e275c61e066ead4613acce524f521e7736c",
+    "conjurer_tank.md": "bd8eeab46c8cf24cd5425ba56c4d0754cd4c00dc36bb24c7da50a6ba63a3e0e8",
+    "berserker_tank.md": "671675248cc37d8b8993ab7fda2475cb1e95598ee894dffce84b0483b00ea180",
+    "other_specializations.md": "2f5400e9ee6214cee0ae7922ad1189568803edc7ba68b0b49e1345d12472f958",
+    "paladin_tank.md": "99832f5dbbbe2ebdfaa4298a145e93407a00dc4c57103ff0548ebb2f909068a1",
+    "paladin_healer.md": "509ff2871befee437f5eaa31d626d87bb723a89428096ac500d87061fceab2f9"
+  }
+}
